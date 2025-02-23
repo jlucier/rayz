@@ -27,14 +27,47 @@ pub const V3 = struct {
         } };
     }
 
+    pub fn sub(self: *const V3, o: *const V3) V3 {
+        return .{ .v = .{
+            self.x() - o.x(),
+            self.y() - o.y(),
+            self.z() - o.z(),
+        } };
+    }
+
+    pub fn mul(self: *const V3, v: f64) V3 {
+        return .{ .v = .{ self.x() * v, self.y() * v, self.z() * v } };
+    }
+    pub fn div(self: *const V3, v: f64) V3 {
+        return self.mul(1 / v);
+    }
+
     pub fn mag(self: *const V3) f64 {
-        return @sqrt(self.x() * self.x() +
-            self.y() * self.y() +
-            self.z() * self.z());
+        return @sqrt(self.dot(self));
+    }
+
+    pub fn unit(self: *const V3) f64 {
+        return self.div(self.mag());
+    }
+
+    pub fn dot(self: *const V3, o: *const V3) f64 {
+        return self.x() * o.x() + self.y() * o.y() + self.z() * o.z();
+    }
+
+    pub fn cross(self: *const V3, o: *const V3) V3 {
+        return .{ .v = .{
+            self.y() * o.z() - self.z() * o.y(),
+            self.z() * o.x() - self.x() * o.z(),
+            self.x() * o.y() - self.y() * o.x(),
+        } };
     }
 };
 
 pub const Ray = struct {
     origin: V3,
     dir: V3,
+
+    pub fn at(self: *const Ray, t: f64) V3 {
+        return self.origin.add(self.dir.mul(t));
+    }
 };
