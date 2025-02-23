@@ -17,11 +17,5 @@ pub fn main() !void {
             im.at(i, j).* = V3.init(r, g, 0.25);
         }
     }
-    const f = try std.fs.cwd().createFile("test.ppm", .{
-        .read = false,
-        .truncate = true,
-    });
-    defer f.close();
-    try im.writePPM(f);
-    std.debug.print("Rayz\n", .{});
+    try im.writePPM(std.io.getStdOut());
 }
