@@ -3,6 +3,29 @@ const vec = @import("./vec.zig");
 
 const V3 = vec.V3;
 
+pub const Camera = struct {
+    aspect_ratio: f64,
+    height: f64,
+    width: f64,
+    focal_length: f64,
+
+    pub fn lower_left(self: *const Camera) V3 {
+        return V3.init(-self.width / 2, -self.height / 2, -self.focal_length);
+    }
+
+    pub fn pxToVp(self: *const Camera, im: *const Image, py: usize, px: usize) V3 {
+        const x: f64 = @floatFromInt(px);
+        const y: f64 = @floatFromInt(py);
+        const w: f64 = @floatFromInt(im.w - 1);
+        const h: f64 = @floatFromInt(im.h - 1);
+        return V3.init(
+            x / w * self.width - self.width / 2,
+            y / h * self.height - self.height / 2,
+            -self.focal_length,
+        );
+    }
+};
+
 pub const Image = struct {
     h: usize,
     w: usize,
@@ -31,7 +54,7 @@ pub const Image = struct {
     pub fn writePPM(self: *const Image, f: std.fs.File) !void {
         const w = f.writer();
 
-        try w.print("P3\n{} {}\n{}\n", .{ self.h, self.w, 255 });
+        try w.print("P3\n{} {}\n{}\n", .{ self.w, self.h, 255 });
 
         for (self.pixels) |px| {
             const x: u8 = @intFromFloat(px.x() * 255);

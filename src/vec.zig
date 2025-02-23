@@ -46,7 +46,7 @@ pub const V3 = struct {
         return @sqrt(self.dot(self));
     }
 
-    pub fn unit(self: *const V3) f64 {
+    pub fn unit(self: *const V3) V3 {
         return self.div(self.mag());
     }
 
