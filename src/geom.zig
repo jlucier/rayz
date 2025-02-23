@@ -67,7 +67,57 @@ pub const V3 = struct {
     }
 };
 
-pub const Sphere = struct {
+pub const Ray = struct {
     origin: V3,
+    dir: V3,
+
+    pub fn at(self: *const Ray, t: f64) V3 {
+        return self.origin.add(self.dir.mul(t));
+    }
+};
+
+pub const Hit = struct {
+    point: V3,
+    normal: V3,
+    t: f64,
+    front_face: bool,
+
+    pub fn init(ray: *const Ray, point: V3, normal: V3, t: f64) Hit {
+        // normal is hitting front if it points against ray dir, otherwise back face
+        const front_face = normal.dot(ray.dir) < 0;
+        return .{
+            .point = point,
+            .normal = if (front_face) normal else normal.mul(-1),
+            .t = t,
+            .front_face = front_face,
+        };
+    }
+};
+
+pub const Sphere = struct {
+    center: V3,
     radius: f64,
+
+    pub fn hit(ptr: *const anyopaque, ray: *const Ray, tmin: f64, tmax: f64) ?Hit {
+        const self: *const Sphere = @ptrCast(@alignCast(ptr));
+
+        // check quadratic formula discriminant for roots, if real roots then hit
+        const offset = ray.origin.sub(self.center);
+
+        const a = ray.dir.dot(ray.dir);
+        const half_b = ray.dir.dot(offset);
+        const c = offset.dot(offset) - self.radius * self.radius;
+
+        const discriminant = half_b * half_b - a * c;
+        if (discriminant < 0)
+            return null;
+
+        const t = (-half_b - @sqrt(discriminant)) / a;
+        if (t < tmin or t > tmax)
+            return null;
+
+        const point = ray.at(t);
+        const n = point.sub(self.center).unit();
+        return Hit.init(ray, point, n, t);
+    }
 };
