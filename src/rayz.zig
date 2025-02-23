@@ -1,11 +1,11 @@
 const std = @import("std");
 const image = @import("./image.zig");
-const vec = @import("./vec.zig");
+const V3 = @import("./geom.zig").V3;
+const tracer = @import("./tracer.zig");
 
-const V3 = vec.V3;
-const Ray = vec.Ray;
 const Image = image.Image;
 const Camera = image.Camera;
+const Ray = tracer.Ray;
 
 fn hitSphere(ray: *const Ray, origin: V3, radius: f64) f64 {
     // check quadratic formula discriminant for roots, if real roots then hit

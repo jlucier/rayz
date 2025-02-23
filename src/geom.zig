@@ -67,11 +67,7 @@ pub const V3 = struct {
     }
 };
 
-pub const Ray = struct {
+pub const Sphere = struct {
     origin: V3,
-    dir: V3,
-
-    pub fn at(self: *const Ray, t: f64) V3 {
-        return self.origin.add(self.dir.mul(t));
-    }
+    radius: f64,
 };
