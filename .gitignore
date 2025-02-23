@@ -1,0 +1,3 @@
+*.ppm
+zig-out
+.zig-cache
