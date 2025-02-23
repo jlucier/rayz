@@ -7,6 +7,10 @@ pub const V3 = struct {
         return .{ .v = .{ x_, y_, z_ } };
     }
 
+    pub fn ones() V3 {
+        return .{ .v = .{ 1, 1, 1 } };
+    }
+
     pub fn x(self: *const V3) f64 {
         return self.v[0];
     }
@@ -19,7 +23,7 @@ pub const V3 = struct {
         return self.v[2];
     }
 
-    pub fn add(self: *const V3, o: *const V3) V3 {
+    pub fn add(self: *const V3, o: V3) V3 {
         return .{ .v = .{
             self.x() + o.x(),
             self.y() + o.y(),
@@ -27,7 +31,7 @@ pub const V3 = struct {
         } };
     }
 
-    pub fn sub(self: *const V3, o: *const V3) V3 {
+    pub fn sub(self: *const V3, o: V3) V3 {
         return .{ .v = .{
             self.x() - o.x(),
             self.y() - o.y(),
@@ -43,18 +47,18 @@ pub const V3 = struct {
     }
 
     pub fn mag(self: *const V3) f64 {
-        return @sqrt(self.dot(self));
+        return @sqrt(self.dot(self.*));
     }
 
     pub fn unit(self: *const V3) V3 {
         return self.div(self.mag());
     }
 
-    pub fn dot(self: *const V3, o: *const V3) f64 {
+    pub fn dot(self: *const V3, o: V3) f64 {
         return self.x() * o.x() + self.y() * o.y() + self.z() * o.z();
     }
 
-    pub fn cross(self: *const V3, o: *const V3) V3 {
+    pub fn cross(self: *const V3, o: V3) V3 {
         return .{ .v = .{
             self.y() * o.z() - self.z() * o.y(),
             self.z() * o.x() - self.x() * o.z(),

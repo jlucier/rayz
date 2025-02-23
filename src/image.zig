@@ -7,7 +7,15 @@ pub const Camera = struct {
     aspect_ratio: f64,
     height: f64,
     width: f64,
-    focal_length: f64,
+    focal_length: f64 = 1,
+
+    pub fn initStandard(aspect_ratio: f64, height: f64) Camera {
+        return .{
+            .aspect_ratio = aspect_ratio,
+            .height = height,
+            .width = height * aspect_ratio,
+        };
+    }
 
     pub fn lower_left(self: *const Camera) V3 {
         return V3.init(-self.width / 2, -self.height / 2, -self.focal_length);
@@ -18,11 +26,10 @@ pub const Camera = struct {
         const y: f64 = @floatFromInt(py);
         const w: f64 = @floatFromInt(im.w - 1);
         const h: f64 = @floatFromInt(im.h - 1);
-        return V3.init(
-            x / w * self.width - self.width / 2,
-            y / h * self.height - self.height / 2,
-            -self.focal_length,
-        );
+        const u = x / w * self.width;
+        const v = y / h * self.height;
+
+        return self.lower_left().add(V3.init(u, v, 0));
     }
 };
 
