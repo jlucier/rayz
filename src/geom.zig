@@ -8,6 +8,23 @@ pub const V3 = struct {
         return .{ .v = .{ x_, y_, z_ } };
     }
 
+    pub fn random(rng: std.Random, low: f64, high: f64) V3 {
+        const scale = high - low;
+        return V3.init(
+            rng.float(f64) * scale + low,
+            rng.float(f64) * scale + low,
+            rng.float(f64) * scale + low,
+        );
+    }
+
+    pub fn randomInUnitSphere(rng: std.Random) V3 {
+        while (true) {
+            const v = V3.random(rng, 0, 1);
+            if (v.mag() < 1)
+                return v;
+        }
+    }
+
     pub fn ones() V3 {
         return .{ .v = .{ 1, 1, 1 } };
     }
