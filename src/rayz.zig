@@ -22,7 +22,16 @@ pub fn main() !void {
         try tracer.addObject(.{ .ptr = s, .hit = geom.Sphere.hit });
     }
 
-    tracer.render();
+    const st = try std.time.Instant.now();
+
+    const rays_traced: f64 = @floatFromInt(tracer.render());
+
+    var durr: f64 = @floatFromInt(std.time.Instant.since(try std.time.Instant.now(), st));
+    durr /= std.time.ns_per_s;
+    std.debug.print("Finished render: {d:.2} rps and {d:.2} us per ray\n", .{
+        rays_traced / durr,
+        std.time.us_per_s * durr / rays_traced,
+    });
 
     if (args.next()) |out_fname| {
         const f = try std.fs.cwd().createFile(out_fname, .{ .read = false, .truncate = true });

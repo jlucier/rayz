@@ -1,4 +1,5 @@
 const std = @import("std");
+const utils = @import("utils.zig");
 
 pub const V3 = struct {
     v: [3]f64 = .{ 0, 0, 0 },
@@ -52,6 +53,14 @@ pub const V3 = struct {
 
     pub fn unit(self: *const V3) V3 {
         return self.div(self.mag());
+    }
+
+    pub fn clamp(self: *const V3, low: f64, high: f64) V3 {
+        return V3.init(
+            utils.clamp(f64, self.x(), low, high),
+            utils.clamp(f64, self.y(), low, high),
+            utils.clamp(f64, self.z(), low, high),
+        );
     }
 
     pub fn dot(self: *const V3, o: V3) f64 {

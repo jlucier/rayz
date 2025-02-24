@@ -6,17 +6,18 @@ pub const Camera = struct {
     height: f64,
     width: f64,
     focal_length: f64 = 1,
+    lower_left: V3,
 
     pub fn initStandard(aspect_ratio: f64, height: f64) Camera {
+        const width = height * aspect_ratio;
+        const focal_length: f64 = 1;
         return .{
             .aspect_ratio = aspect_ratio,
             .height = height,
-            .width = height * aspect_ratio,
+            .width = width,
+            .lower_left = V3.init(-width / 2, -height / 2, -focal_length),
+            .focal_length = focal_length,
         };
-    }
-
-    pub fn lower_left(self: *const Camera) V3 {
-        return V3.init(-self.width / 2, -self.height / 2, -self.focal_length);
     }
 
     pub fn pxToVp(self: *const Camera, im: *const Image, py: usize, px: usize) V3 {
@@ -24,10 +25,11 @@ pub const Camera = struct {
         const y: f64 = @floatFromInt(py);
         const w: f64 = @floatFromInt(im.w - 1);
         const h: f64 = @floatFromInt(im.h - 1);
-        const u = x / w * self.width;
-        const v = y / h * self.height;
+        return self.uvToVp(x / w, y / h);
+    }
 
-        return self.lower_left().add(V3.init(u, v, 0));
+    pub fn uvToVp(self: *const Camera, u: f64, v: f64) V3 {
+        return self.lower_left.add(V3.init(u * self.width, v * self.height, 0));
     }
 };
 

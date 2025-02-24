@@ -17,15 +17,22 @@ pub const Tracer = struct {
     camera: Camera,
     img: Image,
     hittables: std.ArrayList(Hittable),
+    rng: std.Random,
 
     pub fn init(allocator: std.mem.Allocator, img_w: usize, aspect_ratio: f64) !Tracer {
         const fimg_w: f64 = @floatFromInt(img_w);
         const height: usize = @intFromFloat(fimg_w / aspect_ratio);
 
+        var rng = std.rand.DefaultPrng.init(blk: {
+            var seed: u64 = undefined;
+            try std.posix.getrandom(std.mem.asBytes(&seed));
+            break :blk seed;
+        });
         return .{
             .camera = Camera.initStandard(aspect_ratio, 2.0),
             .img = try Image.initEmpty(allocator, height, img_w),
             .hittables = std.ArrayList(Hittable).init(allocator),
+            .rng = rng.random(),
         };
     }
 
@@ -38,25 +45,48 @@ pub const Tracer = struct {
         try self.hittables.append(obj);
     }
 
-    pub fn render(self: *const Tracer) void {
+    pub fn render(self: *const Tracer) usize {
+        var rays: usize = 0;
         var i: usize = 0;
+        const samples_per_px: usize = 100;
+
+        const w: f64 = @floatFromInt(self.img.w - 1);
+        const h: f64 = @floatFromInt(self.img.h - 1);
+
         while (i < self.img.h) : (i += 1) {
             var j: usize = 0;
             while (j < self.img.w) : (j += 1) {
-                const ray = Ray{ .dir = self.camera.pxToVp(&self.img, i, j), .origin = .{} };
+                var r: usize = 0;
+                var acc_color = V3{};
+                while (r < samples_per_px) : (r += 1) {
+                    const u: f64 = @floatFromInt(j);
+                    const v: f64 = @floatFromInt(i);
+                    const ray = Ray{
+                        .dir = self.camera.uvToVp(
+                            (u + self.rng.float(f64)) / w,
+                            (v + self.rng.float(f64)) / h,
+                        ),
+                        .origin = .{},
+                    };
+                    rays += 1;
 
-                var hit: ?Hit = null;
-                for (self.hittables.items) |obj| {
-                    const maxt = if (hit) |h| h.t else std.math.inf(f64);
+                    var maybe_hit: ?Hit = null;
+                    for (self.hittables.items) |obj| {
+                        const maxt = if (maybe_hit) |hit| hit.t else std.math.inf(f64);
 
-                    if (obj.hit(obj.ptr, &ray, 0, maxt)) |new_hit| {
-                        hit = new_hit;
+                        if (obj.hit(obj.ptr, &ray, 0, maxt)) |new_hit| {
+                            maybe_hit = new_hit;
+                        }
                     }
+                    acc_color = acc_color.add(rayColor(&ray, maybe_hit));
                 }
+
                 // 0,0 = lower left
-                self.img.pixels[(self.img.h - 1 - i) * self.img.w + j] = rayColor(&ray, hit);
+                self.img.pixels[(self.img.h - 1 - i) * self.img.w + j] = //
+                    acc_color.div(@floatFromInt(samples_per_px)).clamp(0.0, 1.0);
             }
         }
+        return rays;
     }
 
     fn rayColor(ray: *const Ray, maybe_hit: ?Hit) V3 {
