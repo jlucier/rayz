@@ -64,9 +64,10 @@ pub const Image = struct {
         try w.print("P3\n{} {}\n{}\n", .{ self.w, self.h, 255 });
 
         for (self.pixels) |px| {
-            const x: u8 = @intFromFloat(px.x() * 255);
-            const y: u8 = @intFromFloat(px.y() * 255);
-            const z: u8 = @intFromFloat(px.z() * 255);
+            const clm = px.clamp(0.0, 1.0);
+            const x: u8 = @intFromFloat(clm.x() * 255);
+            const y: u8 = @intFromFloat(clm.y() * 255);
+            const z: u8 = @intFromFloat(clm.z() * 255);
             try w.print("{d} {d} {d}\n", .{ x, y, z });
         }
     }

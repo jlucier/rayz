@@ -18,24 +18,21 @@ pub const Tracer = struct {
     img: Image,
     hittables: std.ArrayList(Hittable),
     rng: std.rand.DefaultPrng,
-    random: std.Random,
     max_bounces: usize = 50,
 
     pub fn init(allocator: std.mem.Allocator, img_w: usize, aspect_ratio: f64) !Tracer {
         const fimg_w: f64 = @floatFromInt(img_w);
         const height: usize = @intFromFloat(fimg_w / aspect_ratio);
 
-        var rng = std.rand.DefaultPrng.init(blk: {
-            var seed: u64 = undefined;
-            try std.posix.getrandom(std.mem.asBytes(&seed));
-            break :blk seed;
-        });
         return .{
             .camera = Camera.initStandard(aspect_ratio, 2.0),
             .img = try Image.initEmpty(allocator, height, img_w),
             .hittables = std.ArrayList(Hittable).init(allocator),
-            .rng = rng,
-            .random = rng.random(),
+            .rng = std.rand.DefaultPrng.init(blk: {
+                var seed: u64 = undefined;
+                try std.posix.getrandom(std.mem.asBytes(&seed));
+                break :blk seed;
+            }),
         };
     }
 
@@ -48,7 +45,7 @@ pub const Tracer = struct {
         try self.hittables.append(obj);
     }
 
-    pub fn render(self: *const Tracer) usize {
+    pub fn render(self: *Tracer) usize {
         var rays: usize = 0;
         var i: usize = 0;
         const samples_per_px: usize = 100;
@@ -66,8 +63,8 @@ pub const Tracer = struct {
                     const v: f64 = @floatFromInt(i);
                     const ray = Ray{
                         .dir = self.camera.uvToVp(
-                            (u + self.random.float(f64)) / w,
-                            (v + self.random.float(f64)) / h,
+                            (u + self.rng.random().float(f64)) / w,
+                            (v + self.rng.random().float(f64)) / h,
                         ),
                         .origin = .{},
                     };
@@ -79,7 +76,7 @@ pub const Tracer = struct {
 
                 // 0,0 = lower left
                 self.img.pixels[(self.img.h - 1 - i) * self.img.w + j] = //
-                    acc_color.div(@floatFromInt(samples_per_px)).clamp(0.0, 1.0);
+                    acc_color.div(@floatFromInt(samples_per_px));
             }
         }
         return rays;
@@ -97,13 +94,13 @@ pub const Tracer = struct {
         return maybe_hit;
     }
 
-    fn bounceRay(self: *const Tracer, ray: Ray, depth: usize) V3 {
+    fn bounceRay(self: *Tracer, ray: Ray, depth: usize) V3 {
         if (depth == 0)
             return V3{};
 
         if (self.findHit(ray)) |hit| {
             // bounce light
-            const rand_loc = V3.randomInUnitSphere(self.random);
+            const rand_loc = V3.randomInUnitSphere(self.rng.random());
             const target = hit.point.add(hit.normal).add(rand_loc);
             const rand_dir = target.sub(hit.point);
             const bounce = Ray{ .origin = hit.point, .dir = rand_dir };
