@@ -95,7 +95,7 @@ pub const Tracer = struct {
 
         if (self.findHit(ray)) |hit| {
             // bounce light
-            if (hit.material.scatter(hit.material.ptr, self.rng.random(), &hit)) |res| {
+            if (hit.material.scatter(hit.material.ptr, self.rng.random(), &ray, &hit)) |res| {
                 return self.bounceRay(res.ray, depth - 1).vecMul(res.attenuation);
             }
             return V3{};

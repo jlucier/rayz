@@ -1,6 +1,6 @@
 const std = @import("std");
 const renderer = @import("./renderer.zig");
-const vec = @import("./vec.zig");
+const V3 = @import("./vec.zig").V3;
 const geom = @import("./geom.zig");
 const mat = @import("./material.zig");
 
@@ -16,21 +16,43 @@ pub fn main() !void {
     defer arena.deinit();
     var tracer = try Tracer.init(arena.allocator(), img_w, 16.0 / 9.0);
 
-    const lambertian = mat.Diffuse{};
-    const diffuse_mat = mat.Material{
-        .ptr = &lambertian,
-        .scatter = mat.Diffuse.scatter,
-    };
+    const mat_ground = mat.Diffuse{ .albedo = V3.init(0.8, 0.8, 0.0) };
+    const mat_center = mat.Diffuse{ .albedo = V3.init(0.7, 0.3, 0.3) };
+    const mat_left = mat.Diffuse{ .albedo = V3.init(0.8, 0.8, 0.8) };
+    const mat_right = mat.Diffuse{ .albedo = V3.init(0.8, 0.6, 0.2) };
+
     const spheres = [_]geom.Sphere{
         .{
-            .center = vec.V3.init(0, 0, -1),
+            .center = V3.init(0, 0, -1),
             .radius = 0.5,
-            .material = diffuse_mat,
+            .material = .{
+                .ptr = &mat_center,
+                .scatter = mat.Diffuse.scatter,
+            },
         },
         .{
-            .center = vec.V3.init(0, -100.5, -1),
+            .center = V3.init(0, -100.5, -1),
             .radius = 100,
-            .material = diffuse_mat,
+            .material = .{
+                .ptr = &mat_ground,
+                .scatter = mat.Diffuse.scatter,
+            },
+        },
+        .{
+            .center = V3.init(-1, 0, -1),
+            .radius = 0.5,
+            .material = .{
+                .ptr = &mat_left,
+                .scatter = mat.Metallic.scatter,
+            },
+        },
+        .{
+            .center = V3.init(1, 0, -1),
+            .radius = 0.5,
+            .material = .{
+                .ptr = &mat_right,
+                .scatter = mat.Metallic.scatter,
+            },
         },
     };
 
