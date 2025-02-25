@@ -17,14 +17,6 @@ pub const V3 = struct {
         );
     }
 
-    pub fn randomInUnitSphere(rng: std.Random) V3 {
-        while (true) {
-            const v = V3.random(rng, 0, 1);
-            if (v.mag() < 1)
-                return v;
-        }
-    }
-
     pub fn ones() V3 {
         return .{ .v = .{ 1, 1, 1 } };
     }

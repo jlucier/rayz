@@ -8,6 +8,12 @@ const V3 = geom.V3;
 const Ray = geom.Ray;
 const Hit = geom.Hit;
 
+pub const BounceMethod = enum {
+    HACK,
+    LAMBERTIAN,
+    HEMISPHERE,
+};
+
 pub const Hittable = struct {
     ptr: *const anyopaque,
     hit: *const fn (ptr: *const anyopaque, ray: *const Ray, tmin: f64, tmax: f64) ?Hit,
@@ -87,7 +93,7 @@ pub const Tracer = struct {
         for (self.hittables.items) |obj| {
             const maxt = if (maybe_hit) |hit| hit.t else std.math.inf(f64);
 
-            if (obj.hit(obj.ptr, &ray, 0, maxt)) |new_hit| {
+            if (obj.hit(obj.ptr, &ray, 0.001, maxt)) |new_hit| {
                 maybe_hit = new_hit;
             }
         }
@@ -100,14 +106,36 @@ pub const Tracer = struct {
 
         if (self.findHit(ray)) |hit| {
             // bounce light
-            const rand_loc = V3.randomInUnitSphere(self.rng.random());
-            const target = hit.point.add(hit.normal).add(rand_loc);
-            const rand_dir = target.sub(hit.point);
-            const bounce = Ray{ .origin = hit.point, .dir = rand_dir };
-            return self.bounceRay(bounce, depth - 1).mul(0.5);
+            return self.bounceRay(self.calculateBounce(hit, .HEMISPHERE), depth - 1).mul(0.5);
         }
         // miss, background gradient
         const t: f64 = 0.5 * (ray.dir.unit().y() + 1.0);
         return V3.init(1.0, 1.0, 1.0).mul(1.0 - t).add(V3.init(0.5, 0.7, 1.0).mul(t));
+    }
+
+    fn calculateBounce(self: *Tracer, hit: Hit, method: BounceMethod) Ray {
+        const target = switch (method) {
+            .HACK => hit.point.add(hit.normal).add(self.randomInUnitSphere()),
+            .LAMBERTIAN => hit.point.add(hit.normal).add(self.randomUnit()),
+            .HEMISPHERE => hit.point.add(self.randomInHemisphere(hit.normal)),
+        };
+        return Ray{ .origin = hit.point, .dir = target.sub(hit.point) };
+    }
+
+    fn randomInUnitSphere(self: *Tracer) V3 {
+        while (true) {
+            const v = V3.random(self.rng.random(), -1, 1);
+            if (v.mag() < 1)
+                return v;
+        }
+    }
+
+    fn randomUnit(self: *Tracer) V3 {
+        return self.randomInUnitSphere().unit();
+    }
+
+    fn randomInHemisphere(self: *Tracer, norm: V3) V3 {
+        const r = self.randomInUnitSphere();
+        return if (r.dot(norm) > 0) r else r.mul(-1);
     }
 };
