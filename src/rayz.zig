@@ -1,6 +1,8 @@
 const std = @import("std");
 const renderer = @import("./renderer.zig");
+const vec = @import("./vec.zig");
 const geom = @import("./geom.zig");
+const mat = @import("./material.zig");
 
 const Tracer = renderer.Tracer;
 
@@ -14,10 +16,24 @@ pub fn main() !void {
     defer arena.deinit();
     var tracer = try Tracer.init(arena.allocator(), img_w, 16.0 / 9.0);
 
-    const spheres = [_]geom.Sphere{
-        .{ .center = geom.V3.init(0, 0, -1), .radius = 0.5 },
-        .{ .center = geom.V3.init(0, -100.5, -1), .radius = 100 },
+    const lambertian = mat.Diffuse{};
+    const diffuse_mat = mat.Material{
+        .ptr = &lambertian,
+        .scatter = mat.Diffuse.scatter,
     };
+    const spheres = [_]geom.Sphere{
+        .{
+            .center = vec.V3.init(0, 0, -1),
+            .radius = 0.5,
+            .material = diffuse_mat,
+        },
+        .{
+            .center = vec.V3.init(0, -100.5, -1),
+            .radius = 100,
+            .material = diffuse_mat,
+        },
+    };
+
     for (&spheres) |*s| {
         try tracer.addObject(.{ .ptr = s, .hit = geom.Sphere.hit });
     }

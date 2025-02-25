@@ -1,27 +1,16 @@
 const std = @import("std");
-const geom = @import("./geom.zig");
+const vec = @import("./vec.zig");
 const image = @import("./image.zig");
+const hitmod = @import("./hit.zig");
 
-const Image = image.Image;
-const Camera = image.Camera;
-const V3 = geom.V3;
-const Ray = geom.Ray;
-const Hit = geom.Hit;
-
-pub const BounceMethod = enum {
-    HACK,
-    LAMBERTIAN,
-    HEMISPHERE,
-};
-
-pub const Hittable = struct {
-    ptr: *const anyopaque,
-    hit: *const fn (ptr: *const anyopaque, ray: *const Ray, tmin: f64, tmax: f64) ?Hit,
-};
+const V3 = vec.V3;
+const Ray = vec.Ray;
+const Hit = hitmod.Hit;
+const Hittable = hitmod.Hittable;
 
 pub const Tracer = struct {
-    camera: Camera,
-    img: Image,
+    camera: image.Camera,
+    img: image.Image,
     hittables: std.ArrayList(Hittable),
     rng: std.rand.DefaultPrng,
     max_bounces: usize = 50,
@@ -31,8 +20,8 @@ pub const Tracer = struct {
         const height: usize = @intFromFloat(fimg_w / aspect_ratio);
 
         return .{
-            .camera = Camera.initStandard(aspect_ratio, 2.0),
-            .img = try Image.initEmpty(allocator, height, img_w),
+            .camera = image.Camera.initStandard(aspect_ratio, 2.0),
+            .img = try image.Image.initEmpty(allocator, height, img_w),
             .hittables = std.ArrayList(Hittable).init(allocator),
             .rng = std.rand.DefaultPrng.init(blk: {
                 var seed: u64 = undefined;
@@ -106,36 +95,13 @@ pub const Tracer = struct {
 
         if (self.findHit(ray)) |hit| {
             // bounce light
-            return self.bounceRay(self.calculateBounce(hit, .HEMISPHERE), depth - 1).mul(0.5);
+            if (hit.material.scatter(hit.material.ptr, self.rng.random(), &hit)) |res| {
+                return self.bounceRay(res.ray, depth - 1).vecMul(res.attenuation);
+            }
+            return V3{};
         }
         // miss, background gradient
         const t: f64 = 0.5 * (ray.dir.unit().y() + 1.0);
         return V3.init(1.0, 1.0, 1.0).mul(1.0 - t).add(V3.init(0.5, 0.7, 1.0).mul(t));
-    }
-
-    fn calculateBounce(self: *Tracer, hit: Hit, method: BounceMethod) Ray {
-        const target = switch (method) {
-            .HACK => hit.point.add(hit.normal).add(self.randomInUnitSphere()),
-            .LAMBERTIAN => hit.point.add(hit.normal).add(self.randomUnit()),
-            .HEMISPHERE => hit.point.add(self.randomInHemisphere(hit.normal)),
-        };
-        return Ray{ .origin = hit.point, .dir = target.sub(hit.point) };
-    }
-
-    fn randomInUnitSphere(self: *Tracer) V3 {
-        while (true) {
-            const v = V3.random(self.rng.random(), -1, 1);
-            if (v.mag() < 1)
-                return v;
-        }
-    }
-
-    fn randomUnit(self: *Tracer) V3 {
-        return self.randomInUnitSphere().unit();
-    }
-
-    fn randomInHemisphere(self: *Tracer, norm: V3) V3 {
-        const r = self.randomInUnitSphere();
-        return if (r.dot(norm) > 0) r else r.mul(-1);
     }
 };

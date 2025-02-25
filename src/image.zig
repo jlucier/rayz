@@ -1,5 +1,5 @@
 const std = @import("std");
-const V3 = @import("./geom.zig").V3;
+const V3 = @import("./vec.zig").V3;
 
 pub const Camera = struct {
     aspect_ratio: f64,
