@@ -17,7 +17,7 @@ pub const Hit = struct {
     material: mat.Material,
 
     pub fn init(ray: *const Ray, point: V3, normal: V3, t: f64, material: mat.Material) Hit {
-        // normal is hitting front if it points against ray dir, otherwise back face
+        // ray is hitting front if it points against normal dir, otherwise back face
         const front_face = normal.dot(ray.dir) < 0;
         return .{
             .point = point,
