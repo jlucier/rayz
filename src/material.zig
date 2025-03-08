@@ -44,7 +44,7 @@ pub const Material = struct {
         return switch (self.mat_type) {
             .Diffuse => self.scatterDiffuse(random, hit),
             .Metallic => self.scatterMetallic(random, ray, hit),
-            .Dielectric => self.scatterDielectric(ray, hit),
+            .Dielectric => self.scatterDielectric(random, ray, hit),
         };
     }
 
@@ -87,6 +87,7 @@ pub const Material = struct {
     }
     pub fn scatterDielectric(
         self: *const Material,
+        random: std.Random,
         ray: *const Ray,
         hit: *const Hit,
     ) ?ScatterResult {
@@ -97,7 +98,7 @@ pub const Material = struct {
         const sin_theta = @sqrt(1 - cos_theta * cos_theta);
 
         var dir = V3{};
-        if (eta * sin_theta > 1.0) {
+        if (eta * sin_theta > 1.0 or reflectance(cos_theta, eta) > random.float(f64)) {
             dir = reflect(ray, hit);
         } else {
             // refract
@@ -112,6 +113,12 @@ pub const Material = struct {
         };
     }
 };
+
+fn reflectance(cos: f64, ri: f64) f64 {
+    var r0 = (1 - ri) / (1 + ri);
+    r0 *= r0;
+    return r0 + (1 - r0) * std.math.pow(f64, 1 - cos, 5);
+}
 
 fn reflect(ray: *const Ray, hit: *const Hit) V3 {
     return ray.dir.sub(hit.normal.mul(2 * ray.dir.dot(hit.normal)));

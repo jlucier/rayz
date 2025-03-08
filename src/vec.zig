@@ -81,6 +81,14 @@ pub const V3 = struct {
         );
     }
 
+    pub fn sqrt(self: *const V3) V3 {
+        return V3.init(
+            if (self.x() > 0) @sqrt(self.x()) else 0,
+            if (self.y() > 0) @sqrt(self.y()) else 0,
+            if (self.z() > 0) @sqrt(self.z()) else 0,
+        );
+    }
+
     pub fn dot(self: *const V3, o: V3) f64 {
         return self.x() * o.x() + self.y() * o.y() + self.z() * o.z();
     }
