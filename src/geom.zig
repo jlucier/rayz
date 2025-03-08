@@ -28,8 +28,9 @@ pub const Sphere = struct {
         if (discriminant < 0)
             return null;
 
-        const t1 = (half_b - @sqrt(discriminant)) / a;
-        const t2 = (half_b + @sqrt(discriminant)) / a;
+        const rt = @sqrt(discriminant);
+        const t1 = (half_b - rt) / a;
+        const t2 = (half_b + rt) / a;
 
         const t: ?f64 = if (t1 >= tmin and t1 <= tmax) t1 //
             else if (t2 >= tmin and t2 <= tmax) t2 //
