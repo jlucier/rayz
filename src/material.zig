@@ -101,9 +101,7 @@ pub const Material = struct {
             dir = reflect(ray, hit);
         } else {
             // refract
-            const perp_comp = hit.normal.mul(cos_theta).add(unit_dir).mul(eta);
-            const parallel_comp = hit.normal.mul(-@sqrt(1 - perp_comp.dot(perp_comp)));
-            dir = perp_comp.add(parallel_comp);
+            dir = refract(unit_dir, hit.normal, eta);
         }
         return .{
             .ray = .{
@@ -119,8 +117,7 @@ fn reflect(ray: *const Ray, hit: *const Hit) V3 {
     return ray.dir.sub(hit.normal.mul(2 * ray.dir.dot(hit.normal)));
 }
 
-fn refract(ray_dir: V3, norm: V3, eta: f64) V3 {
-    const unit_dir = ray_dir.unit();
+fn refract(unit_dir: V3, norm: V3, eta: f64) V3 {
     const cos_theta = unit_dir.mul(-1).dot(norm);
     const perp_comp = norm.mul(cos_theta).add(unit_dir).mul(eta);
     const parallel_comp = norm.mul(-@sqrt(1 - perp_comp.dot(perp_comp)));
@@ -146,7 +143,7 @@ fn randomInHemisphere(random: std.Random, norm: V3) V3 {
 
 test "refract" {
     const a = refract(
-        V3.init(-0.3125, -0.3125, -1),
+        V3.init(-0.3125, -0.3125, -1).unit(),
         V3.init(-0.558127, -0.558127, 0.613994),
         1.0 / 1.5,
     );
