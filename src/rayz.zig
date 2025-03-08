@@ -32,30 +32,30 @@ pub fn main() !void {
                 // .albedo = V3.init(0.8, 0.8, 0.0),
             },
         },
-        // .{
-        //     .center = V3.init(0, -100.5, -1),
-        //     .radius = 100,
-        //     .material = .{
-        //         .mat_type = .Diffuse,
-        //         .albedo = V3.init(0.8, 0.8, 0.0),
-        //     },
-        // },
-        // .{
-        //     .center = V3.init(-1, 0, -1),
-        //     .radius = 0.5,
-        //     .material = .{
-        //         .mat_type = .Dielectric,
-        //         .refractive_index = 1.5,
-        //     },
-        // },
-        // .{
-        //     .center = V3.init(1, 0, -1),
-        //     .radius = 0.5,
-        //     .material = .{
-        //         .mat_type = .Metallic,
-        //         .albedo = V3.init(0.8, 0.6, 0.2),
-        //     },
-        // },
+        .{
+            .center = V3.init(0, -100.5, -1),
+            .radius = 100,
+            .material = .{
+                .mat_type = .Diffuse,
+                .albedo = V3.init(0.8, 0.8, 0.0),
+            },
+        },
+        .{
+            .center = V3.init(-1, 0, -1),
+            .radius = 0.5,
+            .material = .{
+                .mat_type = .Dielectric,
+                .refractive_index = 1.5,
+            },
+        },
+        .{
+            .center = V3.init(1, 0, -1),
+            .radius = 0.5,
+            .material = .{
+                .mat_type = .Metallic,
+                .albedo = V3.init(0.8, 0.6, 0.2),
+            },
+        },
     };
 
     for (&spheres) |*s| {

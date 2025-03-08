@@ -24,19 +24,12 @@ pub const Sphere = struct {
         const c = offset.dot(offset) - self.radius * self.radius;
 
         const discriminant = half_b * half_b - a * c;
-        const t1 = (half_b - @sqrt(discriminant)) / a;
-        const t2 = (half_b + @sqrt(discriminant)) / a;
 
-        std.debug.print("offset: {}\na: {d}\nh: {d}\nc: {d}\ndisc: {d}\nt: {d}\n", .{
-            offset,
-            a,
-            half_b,
-            c,
-            discriminant,
-            t1,
-        });
         if (discriminant < 0)
             return null;
+
+        const t1 = (half_b - @sqrt(discriminant)) / a;
+        const t2 = (half_b + @sqrt(discriminant)) / a;
 
         const t: ?f64 = if (t1 >= tmin and t1 <= tmax) t1 //
             else if (t2 >= tmin and t2 <= tmax) t2 //

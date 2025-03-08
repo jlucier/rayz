@@ -44,7 +44,7 @@ pub const Tracer = struct {
     pub fn render(self: *Tracer) usize {
         var rays: usize = 0;
         var j: usize = 0;
-        const samples_per_px: usize = 1;
+        const samples_per_px: usize = 50;
 
         while (j < self.img.h) : (j += 1) {
             var i: usize = 0;
@@ -53,16 +53,12 @@ pub const Tracer = struct {
                 var acc_color = V3{};
                 while (r < samples_per_px) : (r += 1) {
                     const ray = Ray{
-                        .dir = self.camera.pxToVp(i, j, null
-                            // self.rng.random()
-                        ),
+                        .dir = self.camera.pxToVp(i, j, self.rng.random()),
                         .origin = .{},
                     };
                     rays += 1;
 
-                    // const new_color = if (i != 49 or j != 15) V3.init(0, 0, 0) //
-                    const new_color = self.bounceRay(ray, self.max_bounces, i == 49 and j == 15);
-                    acc_color = acc_color.add(new_color);
+                    acc_color = acc_color.add(self.bounceRay(ray, self.max_bounces));
                 }
 
                 self.img.pixels[j * self.img.w + i] = //
@@ -84,28 +80,17 @@ pub const Tracer = struct {
         return maybe_hit;
     }
 
-    fn bounceRay(self: *Tracer, ray: Ray, depth: usize, print: bool) V3 {
+    fn bounceRay(self: *Tracer, ray: Ray, depth: usize) V3 {
         if (depth == 0)
             return V3{};
 
         if (self.findHit(ray)) |hit| {
             // bounce light
             var ret = V3{};
-            const res = hit.material.scatter(self.rng.random(), &ray, &hit).?;
-            // if () |res| {
-            if (print) {
-                std.debug.print("\nog: {}\n", .{ray});
-            }
-            ret = self.bounceRay(res.ray, depth - 1, print).vecMul(res.attenuation);
-            // }
-            if (print) {
-                std.debug.print("scat: {}\n", .{res.ray});
-                std.debug.print("col: {}\n\n", .{ret});
+            if (hit.material.scatter(self.rng.random(), &ray, &hit)) |res| {
+                ret = self.bounceRay(res.ray, depth - 1).vecMul(res.attenuation);
             }
             return ret;
-        }
-        if (print) {
-            std.debug.print("miss! {}\n", .{ray});
         }
         // miss, background gradient
         const t: f64 = 0.5 * (ray.dir.unit().y() + 1.0);

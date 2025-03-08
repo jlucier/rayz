@@ -50,18 +50,17 @@ pub const Material = struct {
 
     pub fn scatterDiffuse(
         self: *const Material,
-        _: std.Random,
+        random: std.Random,
         hit: *const Hit,
     ) ScatterResult {
-        // var target = switch (self.method) {
-        //     .UNIT_SPHERE => hit.point.add(hit.normal).add(randomInUnitSphere(random)),
-        //     .UNIT_SPHERE_SURFACE => hit.point.add(hit.normal).add(randomUnit(random)),
-        //     .HEMISPHERE => hit.point.add(randomInHemisphere(random, hit.normal)),
-        // };
-        // if (target.nearZero())
-        //     target = hit.normal;
+        var target = switch (self.method) {
+            .UNIT_SPHERE => hit.point.add(hit.normal).add(randomInUnitSphere(random)),
+            .UNIT_SPHERE_SURFACE => hit.point.add(hit.normal).add(randomUnit(random)),
+            .HEMISPHERE => hit.point.add(randomInHemisphere(random, hit.normal)),
+        };
+        if (target.nearZero())
+            target = hit.normal;
 
-        const target = hit.normal;
         return .{
             .ray = .{ .origin = hit.point, .dir = target.sub(hit.point) },
             .attenuation = self.albedo,
@@ -94,19 +93,18 @@ pub const Material = struct {
         const eta = if (hit.front_face) 1 / self.refractive_index else self.refractive_index;
         const unit_dir = ray.dir.unit();
 
-        // std.debug.print("hit: {}\nray: {}\n\n", .{ hit.point, ray.dir });
         const cos_theta = unit_dir.mul(-1).dot(hit.normal);
-        // const sin_theta = @sqrt(1 - cos_theta * cos_theta);
+        const sin_theta = @sqrt(1 - cos_theta * cos_theta);
 
         var dir = V3{};
-        // if (eta * sin_theta > 1.0) {
-        //     dir = reflect(ray, hit);
-        // } else {
-        // refract
-        const perp_comp = hit.normal.mul(cos_theta).add(unit_dir).mul(eta);
-        const parallel_comp = hit.normal.mul(-@sqrt(1 - perp_comp.dot(perp_comp)));
-        dir = perp_comp.add(parallel_comp);
-        // }
+        if (eta * sin_theta > 1.0) {
+            dir = reflect(ray, hit);
+        } else {
+            // refract
+            const perp_comp = hit.normal.mul(cos_theta).add(unit_dir).mul(eta);
+            const parallel_comp = hit.normal.mul(-@sqrt(1 - perp_comp.dot(perp_comp)));
+            dir = perp_comp.add(parallel_comp);
+        }
         return .{
             .ray = .{
                 .origin = hit.point,
@@ -126,13 +124,6 @@ fn refract(ray_dir: V3, norm: V3, eta: f64) V3 {
     const cos_theta = unit_dir.mul(-1).dot(norm);
     const perp_comp = norm.mul(cos_theta).add(unit_dir).mul(eta);
     const parallel_comp = norm.mul(-@sqrt(1 - perp_comp.dot(perp_comp)));
-    // std.debug.print("ud: {}\n-ud: {}\ncos: {d}\nperp: {}\nparallel: {}\n", .{
-    //     unit_dir,
-    //     norm,
-    //     cos_theta,
-    //     perp_comp,
-    //     parallel_comp,
-    // });
     return perp_comp.add(parallel_comp);
 }
 
@@ -160,16 +151,7 @@ test "refract" {
         1.0 / 1.5,
     );
 
-    // cos: 0.242536
-    // perp: {-0.280798, -0.280798, -0.510496}
-    // parllel: {0.425679, 0.425679, -0.468289}
-
     try std.testing.expectApproxEqRel(0.144881, a.x(), 0.0001);
     try std.testing.expectApproxEqRel(0.144881, a.y(), 0.0001);
     try std.testing.expectApproxEqRel(-0.978784, a.z(), 0.0001);
-
-    // hit: {0.168564, -0.168564, -1.63951}
-    // ray: {-0.144881, 0.144881, -0.978784}
-    // res: {-0.521243, 0.521243, -0.67573}
-
 }
