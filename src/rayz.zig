@@ -16,18 +16,13 @@ pub fn main() !void {
     defer arena.deinit();
     var tracer = try Tracer.init(arena.allocator(), img_w, 16.0 / 9.0);
 
-    // const mat_left = mat.Metallic{ .albedo = V3.init(0.8, 0.8, 0.8), .fuzz = 0.3 };
-    // const mat_center = mat.Dielectric{ .refractive_index = 1.5 };
-
     const spheres = [_]geom.Sphere{
         .{
-            .center = V3.init(0, 0, -1),
+            .center = V3.init(0, 0, -1.2),
             .radius = 0.5,
             .material = .{
-                // .mat_type = .Diffuse,
-                // .albedo = V3.init(0.7, 0.3, 0.3),
-                .mat_type = .Dielectric,
-                .refractive_index = 1.5,
+                .mat_type = .Diffuse,
+                .albedo = V3.init(0.1, 0.2, 0.5),
             },
         },
         .{
@@ -52,6 +47,7 @@ pub fn main() !void {
             .material = .{
                 .mat_type = .Metallic,
                 .albedo = V3.init(0.8, 0.6, 0.2),
+                .fuzz = 1.0,
             },
         },
     };

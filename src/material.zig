@@ -58,7 +58,9 @@ pub const Material = struct {
             .UNIT_SPHERE_SURFACE => hit.point.add(hit.normal).add(randomUnit(random)),
             .HEMISPHERE => hit.point.add(randomInHemisphere(random, hit.normal)),
         };
-        // TODO add near zero detection
+        if (target.nearZero())
+            target = hit.normal;
+
         return .{
             .ray = .{ .origin = hit.point, .dir = target.sub(hit.point) },
             .attenuation = self.albedo,
@@ -92,18 +94,15 @@ pub const Material = struct {
         const unit_dir = ray.dir.unit();
 
         const cos_theta = unit_dir.mul(-1).dot(hit.normal);
-        // const sin_theta = @sqrt(1 - cos_theta * cos_theta);
+        const sin_theta = @sqrt(1 - cos_theta * cos_theta);
 
         var dir = V3{};
-        // if (eta * sin_theta > 1.0) {
-        //     dir = reflect(ray, hit);
-        // } else {
-        // refract
-        // TODO this is clearly kinda busted
-        const perp_comp = hit.normal.mul(cos_theta).add(unit_dir).mul(eta);
-        const parallel_comp = hit.normal.mul(-@sqrt(1 - perp_comp.dot(perp_comp)));
-        dir = perp_comp.add(parallel_comp);
-        // }
+        if (eta * sin_theta > 1.0) {
+            dir = reflect(ray, hit);
+        } else {
+            // refract
+            dir = refract(unit_dir, hit.normal, eta);
+        }
         return .{
             .ray = .{
                 .origin = hit.point,
@@ -116,6 +115,13 @@ pub const Material = struct {
 
 fn reflect(ray: *const Ray, hit: *const Hit) V3 {
     return ray.dir.sub(hit.normal.mul(2 * ray.dir.dot(hit.normal)));
+}
+
+fn refract(unit_dir: V3, norm: V3, eta: f64) V3 {
+    const cos_theta = unit_dir.mul(-1).dot(norm);
+    const perp_comp = norm.mul(cos_theta).add(unit_dir).mul(eta);
+    const parallel_comp = norm.mul(-@sqrt(1 - perp_comp.dot(perp_comp)));
+    return perp_comp.add(parallel_comp);
 }
 
 fn randomInUnitSphere(random: std.Random) V3 {
@@ -133,4 +139,16 @@ fn randomUnit(random: std.Random) V3 {
 fn randomInHemisphere(random: std.Random, norm: V3) V3 {
     const r = randomInUnitSphere(random);
     return if (r.dot(norm) > 0) r else r.mul(-1);
+}
+
+test "refract" {
+    const a = refract(
+        V3.init(-0.3125, -0.3125, -1).unit(),
+        V3.init(-0.558127, -0.558127, 0.613994),
+        1.0 / 1.5,
+    );
+
+    try std.testing.expectApproxEqRel(0.144881, a.x(), 0.0001);
+    try std.testing.expectApproxEqRel(0.144881, a.y(), 0.0001);
+    try std.testing.expectApproxEqRel(-0.978784, a.z(), 0.0001);
 }
