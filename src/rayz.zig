@@ -18,6 +18,8 @@ pub fn main() !void {
         arena.allocator(),
         img_w,
         20.0, // vfov
+        3.4, // focal dist
+        10.0, // defocus angle
         V3.init(-2, 2, 1), // look_from
         V3.init(0, 0, -1), // look_at
         V3.y_hat(), // vup

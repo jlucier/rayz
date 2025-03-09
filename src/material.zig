@@ -73,14 +73,19 @@ pub const Material = struct {
         ray: *const Ray,
         hit: *const Hit,
     ) ?ScatterResult {
-        const reflection_dir = reflect(ray, hit);
+        var reflection_dir = reflect(ray, hit).unit();
+        if (self.fuzz > 0) {
+            reflection_dir = reflection_dir.add(
+                randomUnit(random).mul(@min(self.fuzz, 1)),
+            );
+        }
+
         if (reflection_dir.dot(hit.normal) <= 0)
             return null;
         return .{
             .ray = .{
                 .origin = hit.point,
-                .dir = if (self.fuzz <= 0) reflection_dir else //
-                reflection_dir.add(randomInUnitSphere(random).mul(@max(self.fuzz, 1))),
+                .dir = reflection_dir,
             },
             .attenuation = self.albedo,
         };
@@ -134,7 +139,7 @@ fn refract(unit_dir: V3, norm: V3, eta: f64) V3 {
 fn randomInUnitSphere(random: std.Random) V3 {
     while (true) {
         const v = V3.random(random, -1, 1);
-        if (v.mag() < 1)
+        if (v.mag() <= 1)
             return v;
     }
 }
