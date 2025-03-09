@@ -12,29 +12,49 @@ const DEG_TO_RAD = std.math.pi / 180.0;
 const ASPECT_RATIO = 16.0 / 9.0;
 
 pub const Camera = struct {
-    px_delta: V3,
-    lower_left: V3,
+    look_from: V3,
+    // px_delta: V3,
+    px_du: V3,
+    px_dv: V3,
+    px_origin: V3,
 
-    pub fn initStandard(
+    pub fn init(
         vfov: f64,
-        focal_length: f64,
+        look_from: V3,
+        look_at: V3,
+        vup: V3,
         img_height: usize,
         img_width: usize,
     ) Camera {
-        const fh: f64 = @floatFromInt(img_height);
-        const fw: f64 = @floatFromInt(img_width);
+        const fimg_h: f64 = @floatFromInt(img_height);
+        const fimg_w: f64 = @floatFromInt(img_width);
 
-        const height = 2 * std.math.tan(vfov * DEG_TO_RAD / 2.0) * focal_length;
-        const width = height * fw / fh;
+        const focal_length = look_from.sub(look_at).mag();
+        const vp_height = 2 * std.math.tan(vfov * DEG_TO_RAD / 2.0) * focal_length;
+        const vp_width = vp_height * fimg_w / fimg_h;
 
-        const px_delta = V3.init(width / fw, -height / fh, 0);
+        const w = look_from.sub(look_at).unit();
+        const u = vup.cross(w).unit();
+        const v = w.cross(u);
+
+        const vp_u = u.mul(vp_width);
+        const vp_v = v.mul(-vp_height);
+        const px_du = vp_u.div(fimg_w);
+        const px_dv = vp_v.div(fimg_h);
+
+        const vp_origin = look_from.sub(w.mul(focal_length)).sub(vp_u.div(2)).sub(
+            vp_v.div(2),
+        ).add(px_du.add(px_dv).mul(0.5));
+
         return .{
-            .lower_left = V3.init(-width / 2, height / 2, -focal_length).add(px_delta.mul(0.5)),
-            .px_delta = px_delta,
+            .look_from = look_from,
+            .px_du = px_du,
+            .px_dv = px_dv,
+            .px_origin = vp_origin,
         };
     }
 
-    pub fn pxToVp(self: *const Camera, px: usize, py: usize, rng: ?std.Random) V3 {
+    pub fn getVpRay(self: *const Camera, px: usize, py: usize, rng: ?std.Random) Ray {
         var x: f64 = @floatFromInt(px);
         var y: f64 = @floatFromInt(py);
         if (rng) |r| {
@@ -42,7 +62,12 @@ pub const Camera = struct {
             y += r.float(f64);
         }
 
-        return V3.init(x * self.px_delta.x(), y * self.px_delta.y(), 0).add(self.lower_left);
+        return .{
+            .dir = self.px_du.mul(x).add(self.px_dv.mul(y)).add(
+                self.px_origin,
+            ).sub(self.look_from),
+            .origin = self.look_from,
+        };
     }
 };
 
@@ -54,12 +79,26 @@ pub const Tracer = struct {
     max_bounces: usize = 50,
     samples_per_px: usize = 100,
 
-    pub fn init(allocator: std.mem.Allocator, img_w: usize) !Tracer {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        img_w: usize,
+        vfov: f64,
+        look_from: V3,
+        look_at: V3,
+        vup: V3,
+    ) !Tracer {
         const fimg_w: f64 = @floatFromInt(img_w);
         const height: usize = @intFromFloat(fimg_w / ASPECT_RATIO);
 
         return .{
-            .camera = Camera.initStandard(90.0, 1.0, height, img_w),
+            .camera = Camera.init(
+                vfov,
+                look_from,
+                look_at,
+                vup,
+                height,
+                img_w,
+            ),
             .img = try image.Image.initEmpty(allocator, height, img_w),
             .hittables = std.ArrayList(Hittable).init(allocator),
             .rng = std.Random.DefaultPrng.init(blk: {
@@ -92,10 +131,7 @@ pub const Tracer = struct {
                 var r: usize = 0;
                 var acc_color = V3{};
                 while (r < self.samples_per_px) : (r += 1) {
-                    const ray = Ray{
-                        .dir = self.camera.pxToVp(i, j, self.rng.random()),
-                        .origin = .{},
-                    };
+                    const ray = self.camera.getVpRay(i, j, self.rng.random());
                     rays += 1;
 
                     acc_color = acc_color.add(self.bounceRay(ray, self.max_bounces));
@@ -139,3 +175,25 @@ pub const Tracer = struct {
         return V3.init(1.0, 1.0, 1.0).mul(1.0 - t).add(V3.init(0.5, 0.7, 1.0).mul(t));
     }
 };
+
+test "get ray" {
+    const cam = Camera.init(
+        90,
+        V3.init(-2, 2, 1), // look_from
+        V3.init(0, 0, -1), // look_at
+        V3.y_hat(), // vup
+        225,
+        400,
+    );
+
+    const r1 = cam.getVpRay(0, 0, null);
+    const r2 = cam.getVpRay(112, 199, null);
+
+    try std.testing.expectApproxEqRel(-0.935834, r1.dir.x(), 1e-5);
+    try std.testing.expectApproxEqRel(0.815856, r1.dir.y(), 1e-5);
+    try std.testing.expectApproxEqRel(-7.75169, r1.dir.z(), 1e-5);
+
+    try std.testing.expectApproxEqRel(-0.998817, r2.dir.x(), 1e-5);
+    try std.testing.expectApproxEqRel(-4.18732, r2.dir.y(), 1e-5);
+    try std.testing.expectApproxEqRel(-2.8115, r2.dir.z(), 1e-5);
+}

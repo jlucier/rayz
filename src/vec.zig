@@ -25,6 +25,18 @@ pub const V3 = struct {
         return V3.of(1);
     }
 
+    pub fn x_hat() V3 {
+        return V3.init(1, 0, 0);
+    }
+
+    pub fn y_hat() V3 {
+        return V3.init(0, 1, 0);
+    }
+
+    pub fn z_hat() V3 {
+        return V3.init(0, 0, 1);
+    }
+
     pub fn x(self: *const V3) f64 {
         return self.v[0];
     }

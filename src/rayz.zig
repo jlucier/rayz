@@ -14,61 +14,59 @@ pub fn main() !void {
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var tracer = try Tracer.init(arena.allocator(), img_w);
+    var tracer = try Tracer.init(
+        arena.allocator(),
+        img_w,
+        20.0, // vfov
+        V3.init(-2, 2, 1), // look_from
+        V3.init(0, 0, -1), // look_at
+        V3.y_hat(), // vup
+    );
 
-    const R = @cos(std.math.pi / 4.0);
     const spheres = [_]geom.Sphere{
-        .{ .center = V3.init(-R, 0, -1), .radius = R, .material = .{
-            .mat_type = .Diffuse,
-            .albedo = V3.init(0, 0, 1),
-        } },
-        .{ .center = V3.init(R, 0, -1), .radius = R, .material = .{
-            .mat_type = .Diffuse,
-            .albedo = V3.init(1, 0, 0),
-        } },
-        // .{
-        //     .center = V3.init(0, 0, -1.2),
-        //     .radius = 0.5,
-        //     .material = .{
-        //         .mat_type = .Diffuse,
-        //         .albedo = V3.init(0.1, 0.2, 0.5),
-        //     },
-        // },
-        // .{
-        //     .center = V3.init(0, -100.5, -1),
-        //     .radius = 100,
-        //     .material = .{
-        //         .mat_type = .Diffuse,
-        //         .albedo = V3.init(0.8, 0.8, 0.0),
-        //     },
-        // },
-        // // left outer
-        // .{
-        //     .center = V3.init(-1, 0, -1),
-        //     .radius = 0.5,
-        //     .material = .{
-        //         .mat_type = .Dielectric,
-        //         .refractive_index = 1.5,
-        //     },
-        // },
-        // // left inner bubble
-        // .{
-        //     .center = V3.init(-1, 0, -1),
-        //     .radius = 0.4,
-        //     .material = .{
-        //         .mat_type = .Dielectric,
-        //         .refractive_index = 1.0 / 1.5,
-        //     },
-        // },
-        // .{
-        //     .center = V3.init(1, 0, -1),
-        //     .radius = 0.5,
-        //     .material = .{
-        //         .mat_type = .Metallic,
-        //         .albedo = V3.init(0.8, 0.6, 0.2),
-        //         .fuzz = 1.0,
-        //     },
-        // },
+        .{
+            .center = V3.init(0, 0, -1.2),
+            .radius = 0.5,
+            .material = .{
+                .mat_type = .Diffuse,
+                .albedo = V3.init(0.1, 0.2, 0.5),
+            },
+        },
+        .{
+            .center = V3.init(0, -100.5, -1),
+            .radius = 100,
+            .material = .{
+                .mat_type = .Diffuse,
+                .albedo = V3.init(0.8, 0.8, 0.0),
+            },
+        },
+        // left outer
+        .{
+            .center = V3.init(-1, 0, -1),
+            .radius = 0.5,
+            .material = .{
+                .mat_type = .Dielectric,
+                .refractive_index = 1.5,
+            },
+        },
+        // left inner bubble
+        .{
+            .center = V3.init(-1, 0, -1),
+            .radius = 0.4,
+            .material = .{
+                .mat_type = .Dielectric,
+                .refractive_index = 1.0 / 1.5,
+            },
+        },
+        .{
+            .center = V3.init(1, 0, -1),
+            .radius = 0.5,
+            .material = .{
+                .mat_type = .Metallic,
+                .albedo = V3.init(0.8, 0.6, 0.2),
+                .fuzz = 1.0,
+            },
+        },
     };
 
     for (&spheres) |*s| {
