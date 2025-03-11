@@ -100,7 +100,7 @@ pub const Tracer = struct {
     hittables: std.ArrayList(Hittable),
     rng: std.Random.DefaultPrng,
     max_bounces: usize = 50,
-    samples_per_px: usize = 100,
+    samples_per_px: usize = 500,
 
     pub fn init(
         allocator: std.mem.Allocator,
