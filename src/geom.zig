@@ -6,7 +6,7 @@ const mat = @import("./material.zig");
 const Hit = hit.Hit;
 
 pub const Sphere = struct {
-    center: vec.V3,
+    center: vec.Ray,
     radius: f64,
     material: mat.Material,
 
@@ -17,7 +17,8 @@ pub const Sphere = struct {
 
     fn hitInner(self: *const Sphere, ray: *const vec.Ray, tmin: f64, tmax: f64) ?Hit {
         // check quadratic formula discriminant for roots, if real roots then hit
-        const offset = self.center.sub(ray.origin);
+        const origin_now = self.center.at(ray.time);
+        const offset = origin_now.sub(ray.origin);
 
         const a = ray.dir.dot(ray.dir);
         const half_b = ray.dir.dot(offset);
@@ -40,7 +41,7 @@ pub const Sphere = struct {
             return null;
 
         const point = ray.at(t.?);
-        const n = point.sub(self.center).unit();
+        const n = point.sub(origin_now).unit();
         return Hit.init(ray, point, n, t.?, self.material);
     }
 };

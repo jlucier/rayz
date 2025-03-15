@@ -61,7 +61,7 @@ pub const Camera = struct {
         };
     }
 
-    pub fn getVpRay(self: *const Camera, px: usize, py: usize, rng: ?std.Random) Ray {
+    pub fn getRay(self: *const Camera, px: usize, py: usize, rng: ?std.Random) Ray {
         var x: f64 = @floatFromInt(px);
         var y: f64 = @floatFromInt(py);
         var origin = self.look_from;
@@ -77,6 +77,7 @@ pub const Camera = struct {
                 self.px_origin,
             ).sub(origin),
             .origin = origin,
+            .time = if (rng) |r| r.float(f64) else 0,
         };
     }
 
@@ -100,7 +101,7 @@ pub const Tracer = struct {
     hittables: std.ArrayList(Hittable),
     rng: std.Random.DefaultPrng,
     max_bounces: usize = 50,
-    samples_per_px: usize = 500,
+    samples_per_px: usize = 100,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -158,7 +159,7 @@ pub const Tracer = struct {
                 var r: usize = 0;
                 var acc_color = V3{};
                 while (r < self.samples_per_px) : (r += 1) {
-                    const ray = self.camera.getVpRay(i, j, self.rng.random());
+                    const ray = self.camera.getRay(i, j, self.rng.random());
                     rays += 1;
 
                     acc_color = acc_color.add(self.bounceRay(ray, self.max_bounces));
@@ -213,8 +214,8 @@ test "get ray" {
         400,
     );
 
-    const r1 = cam.getVpRay(0, 0, null);
-    const r2 = cam.getVpRay(112, 199, null);
+    const r1 = cam.getRay(0, 0, null);
+    const r2 = cam.getRay(112, 199, null);
 
     try std.testing.expectApproxEqRel(-0.935834, r1.dir.x, 1e-5);
     try std.testing.expectApproxEqRel(0.815856, r1.dir.y, 1e-5);

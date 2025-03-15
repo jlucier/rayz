@@ -112,6 +112,7 @@ pub const V3 = struct {
 pub const Ray = struct {
     origin: V3,
     dir: V3,
+    time: f64 = 0,
 
     pub fn at(self: *const Ray, t: f64) V3 {
         return self.origin.add(self.dir.mul(t));

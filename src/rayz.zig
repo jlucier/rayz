@@ -1,10 +1,11 @@
 const std = @import("std");
 const renderer = @import("./renderer.zig");
-const V3 = @import("./vec.zig").V3;
+const vec = @import("./vec.zig");
 const geom = @import("./geom.zig");
 const mat = @import("./material.zig");
 
 const Tracer = renderer.Tracer;
+const V3 = vec.V3;
 
 pub fn main() !void {
     var args = std.process.args();
@@ -31,7 +32,7 @@ pub fn main() !void {
 
     // ground
     try spheres.append(.{
-        .center = V3{ .x = 0, .y = -1000, .z = 0 },
+        .center = .{ .origin = V3{ .x = 0, .y = -1000, .z = 0 }, .dir = V3{} },
         .radius = 1000,
         .material = .{
             .mat_type = .Diffuse,
@@ -41,7 +42,7 @@ pub fn main() !void {
 
     // main 3
     try spheres.append(.{
-        .center = V3{ .x = 0, .y = 1, .z = 0 },
+        .center = .{ .origin = V3{ .x = 0, .y = 1, .z = 0 }, .dir = V3{} },
         .radius = 1.0,
         .material = .{
             .mat_type = .Dielectric,
@@ -49,7 +50,7 @@ pub fn main() !void {
         },
     });
     try spheres.append(.{
-        .center = V3{ .x = -4, .y = 1, .z = 0 },
+        .center = .{ .origin = V3{ .x = -4, .y = 1, .z = 0 }, .dir = V3{} },
         .radius = 1.0,
         .material = .{
             .mat_type = .Diffuse,
@@ -57,7 +58,7 @@ pub fn main() !void {
         },
     });
     try spheres.append(.{
-        .center = V3{ .x = 4, .y = 1, .z = 0 },
+        .center = .{ .origin = V3{ .x = 4, .y = 1, .z = 0 }, .dir = V3{} },
         .radius = 1.0,
         .material = .{
             .mat_type = .Metallic,
@@ -76,11 +77,19 @@ pub fn main() !void {
 
             const fa: f64 = @floatFromInt(a);
             const fb: f64 = @floatFromInt(b);
-            const center = V3{ .x = fa + 0.9 * rand.float(f64), .y = 0.2, .z = fb + 0.9 * rand.float(f64) };
+            const center = V3{
+                .x = fa + 0.9 * rand.float(f64),
+                .y = 0.2,
+                .z = fb + 0.9 * rand.float(f64),
+            };
 
             if (center.sub(V3{ .x = 4, .y = 0.2, .z = 0 }).mag() <= 0.9)
                 continue;
 
+            var sphere_ray = vec.Ray{
+                .origin = center,
+                .dir = V3{},
+            };
             var m = mat.Material{
                 .mat_type = .Dielectric,
             };
@@ -88,6 +97,8 @@ pub fn main() !void {
             if (rand_mat < 0.8) {
                 m.mat_type = .Diffuse;
                 m.albedo = V3.random(rand, 0, 1.0).vecMul(V3.random(rand, 0, 1.0));
+                // moving from center up in y by [0,0.5] over the time window
+                sphere_ray.dir = V3.y_hat().mul(rand.float(f64) * 0.5);
             } else if (rand_mat < 0.95) {
                 m.mat_type = .Metallic;
                 m.albedo = V3.random(rand, 0.5, 1.0);
@@ -99,7 +110,7 @@ pub fn main() !void {
             }
 
             try spheres.append(.{
-                .center = center,
+                .center = sphere_ray,
                 .radius = 0.2,
                 .material = m,
             });

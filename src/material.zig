@@ -42,7 +42,7 @@ pub const Material = struct {
         hit: *const Hit,
     ) ?ScatterResult {
         return switch (self.mat_type) {
-            .Diffuse => self.scatterDiffuse(random, hit),
+            .Diffuse => self.scatterDiffuse(random, ray, hit),
             .Metallic => self.scatterMetallic(random, ray, hit),
             .Dielectric => self.scatterDielectric(random, ray, hit),
         };
@@ -51,6 +51,7 @@ pub const Material = struct {
     pub fn scatterDiffuse(
         self: *const Material,
         random: std.Random,
+        ray: *const Ray,
         hit: *const Hit,
     ) ScatterResult {
         var target = switch (self.method) {
@@ -62,7 +63,11 @@ pub const Material = struct {
             target = hit.normal;
 
         return .{
-            .ray = .{ .origin = hit.point, .dir = target.sub(hit.point) },
+            .ray = .{
+                .origin = hit.point,
+                .dir = target.sub(hit.point),
+                .time = ray.time,
+            },
             .attenuation = self.albedo,
         };
     }
@@ -86,6 +91,7 @@ pub const Material = struct {
             .ray = .{
                 .origin = hit.point,
                 .dir = reflection_dir,
+                .time = ray.time,
             },
             .attenuation = self.albedo,
         };
@@ -113,6 +119,7 @@ pub const Material = struct {
             .ray = .{
                 .origin = hit.point,
                 .dir = dir,
+                .time = ray.time,
             },
             .attenuation = V3.ones(),
         };
