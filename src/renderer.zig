@@ -86,9 +86,9 @@ pub const Camera = struct {
         }
 
         while (true) {
-            const v = V3.init(rng.float(f64) * 2 - 1, rng.float(f64) * 2 - 1, 0);
+            const v = V3{ .x = rng.float(f64) * 2 - 1, .y = rng.float(f64) * 2 - 1, .z = 0 };
             if (v.dot(v) <= 1) {
-                return self.defocus_u.mul(v.x()).add(self.defocus_v.mul(v.y()));
+                return self.defocus_u.mul(v.x).add(self.defocus_v.mul(v.y));
             }
         }
     }
@@ -198,16 +198,16 @@ pub const Tracer = struct {
             return ret;
         }
         // miss, background gradient
-        const t: f64 = 0.5 * (ray.dir.unit().y() + 1.0);
-        return V3.init(1.0, 1.0, 1.0).mul(1.0 - t).add(V3.init(0.5, 0.7, 1.0).mul(t));
+        const t: f64 = 0.5 * (ray.dir.unit().y + 1.0);
+        return V3.ones().mul(1.0 - t).add(V3{ .x = 0.5, .y = 0.7, .z = 1.0 }).mul(t);
     }
 };
 
 test "get ray" {
     const cam = Camera.init(
         90,
-        V3.init(-2, 2, 1), // look_from
-        V3.init(0, 0, -1), // look_at
+        V3{ .x = -2, .y = 2, .z = 1 }, // look_from
+        V3{ .x = 0, .y = 0, .z = -1 }, // look_at
         V3.y_hat(), // vup
         225,
         400,
@@ -216,11 +216,11 @@ test "get ray" {
     const r1 = cam.getVpRay(0, 0, null);
     const r2 = cam.getVpRay(112, 199, null);
 
-    try std.testing.expectApproxEqRel(-0.935834, r1.dir.x(), 1e-5);
-    try std.testing.expectApproxEqRel(0.815856, r1.dir.y(), 1e-5);
-    try std.testing.expectApproxEqRel(-7.75169, r1.dir.z(), 1e-5);
+    try std.testing.expectApproxEqRel(-0.935834, r1.dir.x, 1e-5);
+    try std.testing.expectApproxEqRel(0.815856, r1.dir.y, 1e-5);
+    try std.testing.expectApproxEqRel(-7.75169, r1.dir.z, 1e-5);
 
-    try std.testing.expectApproxEqRel(-0.998817, r2.dir.x(), 1e-5);
-    try std.testing.expectApproxEqRel(-4.18732, r2.dir.y(), 1e-5);
-    try std.testing.expectApproxEqRel(-2.8115, r2.dir.z(), 1e-5);
+    try std.testing.expectApproxEqRel(-0.998817, r2.dir.x, 1e-5);
+    try std.testing.expectApproxEqRel(-4.18732, r2.dir.y, 1e-5);
+    try std.testing.expectApproxEqRel(-2.8115, r2.dir.z, 1e-5);
 }

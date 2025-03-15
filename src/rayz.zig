@@ -22,7 +22,7 @@ pub fn main() !void {
         20.0, // vfov
         10.0, // focal dist
         0.6, // defocus angle
-        V3.init(13, 2, 3), // look_from
+        V3{ .x = 13, .y = 2, .z = 3 }, // look_from
         V3{}, // look_at
         V3.y_hat(), // vup
     );
@@ -31,17 +31,17 @@ pub fn main() !void {
 
     // ground
     try spheres.append(.{
-        .center = V3.init(0, -1000, 0),
+        .center = V3{ .x = 0, .y = -1000, .z = 0 },
         .radius = 1000,
         .material = .{
             .mat_type = .Diffuse,
-            .albedo = V3.init(0.5, 0.5, 0.5),
+            .albedo = V3{ .x = 0.5, .y = 0.5, .z = 0.5 },
         },
     });
 
     // main 3
     try spheres.append(.{
-        .center = V3.init(0, 1, 0),
+        .center = V3{ .x = 0, .y = 1, .z = 0 },
         .radius = 1.0,
         .material = .{
             .mat_type = .Dielectric,
@@ -49,19 +49,19 @@ pub fn main() !void {
         },
     });
     try spheres.append(.{
-        .center = V3.init(-4, 1, 0),
+        .center = V3{ .x = -4, .y = 1, .z = 0 },
         .radius = 1.0,
         .material = .{
             .mat_type = .Diffuse,
-            .albedo = V3.init(0.4, 0.2, 0.1),
+            .albedo = V3{ .x = 0.4, .y = 0.2, .z = 0.1 },
         },
     });
     try spheres.append(.{
-        .center = V3.init(4, 1, 0),
+        .center = V3{ .x = 4, .y = 1, .z = 0 },
         .radius = 1.0,
         .material = .{
             .mat_type = .Metallic,
-            .albedo = V3.init(0.7, 0.6, 0.5),
+            .albedo = V3{ .x = 0.7, .y = 0.6, .z = 0.5 },
         },
     });
 
@@ -76,9 +76,9 @@ pub fn main() !void {
 
             const fa: f64 = @floatFromInt(a);
             const fb: f64 = @floatFromInt(b);
-            const center = V3.init(fa + 0.9 * rand.float(f64), 0.2, fb + 0.9 * rand.float(f64));
+            const center = V3{ .x = fa + 0.9 * rand.float(f64), .y = 0.2, .z = fb + 0.9 * rand.float(f64) };
 
-            if (center.sub(V3.init(4, 0.2, 0)).mag() <= 0.9)
+            if (center.sub(V3{ .x = 4, .y = 0.2, .z = 0 }).mag() <= 0.9)
                 continue;
 
             var m = mat.Material{
@@ -137,31 +137,31 @@ pub fn penultimate_scene(allocator: std.mem.Allocator, img_w: usize) void {
         20.0, // vfov
         3.4, // focal dist
         10.0, // defocus angle
-        V3.init(-2, 2, 1), // look_from
-        V3.init(0, 0, -1), // look_at
+        V3{ .x = -2, .y = 2, .z = 1 }, // look_from
+        V3{ .x = 0, .y = 0, .z = -1 }, // look_at
         V3.y_hat(), // vup
     );
 
     const spheres = [_]geom.Sphere{
         .{
-            .center = V3.init(0, 0, -1.2),
+            .center = V3{ .x = 0, .y = 0, .z = -1.2 },
             .radius = 0.5,
             .material = .{
                 .mat_type = .Diffuse,
-                .albedo = V3.init(0.1, 0.2, 0.5),
+                .albedo = V3{ .x = 0.1, .y = 0.2, .z = 0.5 },
             },
         },
         .{
-            .center = V3.init(0, -100.5, -1),
+            .center = V3{ .x = 0, .y = -100.5, .z = -1 },
             .radius = 100,
             .material = .{
                 .mat_type = .Diffuse,
-                .albedo = V3.init(0.8, 0.8, 0.0),
+                .albedo = V3{ .x = 0.8, .y = 0.8, .z = 0.0 },
             },
         },
         // left outer
         .{
-            .center = V3.init(-1, 0, -1),
+            .center = V3{ .x = -1, .y = 0, .z = -1 },
             .radius = 0.5,
             .material = .{
                 .mat_type = .Dielectric,
@@ -170,7 +170,7 @@ pub fn penultimate_scene(allocator: std.mem.Allocator, img_w: usize) void {
         },
         // left inner bubble
         .{
-            .center = V3.init(-1, 0, -1),
+            .center = V3{ .x = -1, .y = 0, .z = -1 },
             .radius = 0.4,
             .material = .{
                 .mat_type = .Dielectric,
@@ -178,11 +178,11 @@ pub fn penultimate_scene(allocator: std.mem.Allocator, img_w: usize) void {
             },
         },
         .{
-            .center = V3.init(1, 0, -1),
+            .center = V3{ .x = 1, .y = 0, .z = -1 },
             .radius = 0.5,
             .material = .{
                 .mat_type = .Metallic,
-                .albedo = V3.init(0.8, 0.6, 0.2),
+                .albedo = V3{ .x = 0.8, .y = 0.6, .z = 0.2 },
                 .fuzz = 1.0,
             },
         },

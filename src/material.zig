@@ -155,12 +155,12 @@ fn randomInHemisphere(random: std.Random, norm: V3) V3 {
 
 test "refract" {
     const a = refract(
-        V3.init(-0.3125, -0.3125, -1).unit(),
-        V3.init(-0.558127, -0.558127, 0.613994),
+        (V3{ .x = -0.3125, .y = -0.3125, .z = -1 }).unit(),
+        V3{ .x = -0.558127, .y = -0.558127, .z = 0.613994 },
         1.0 / 1.5,
     );
 
-    try std.testing.expectApproxEqRel(0.144881, a.x(), 0.0001);
-    try std.testing.expectApproxEqRel(0.144881, a.y(), 0.0001);
-    try std.testing.expectApproxEqRel(-0.978784, a.z(), 0.0001);
+    try std.testing.expectApproxEqRel(0.144881, a.x, 0.0001);
+    try std.testing.expectApproxEqRel(0.144881, a.y, 0.0001);
+    try std.testing.expectApproxEqRel(-0.978784, a.z, 0.0001);
 }

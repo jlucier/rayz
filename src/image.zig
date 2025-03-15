@@ -33,9 +33,9 @@ pub const Image = struct {
 
         for (self.pixels) |px| {
             const clm = px.sqrt().clamp(0, 1);
-            const x: u8 = @intFromFloat(clm.x() * 255);
-            const y: u8 = @intFromFloat(clm.y() * 255);
-            const z: u8 = @intFromFloat(clm.z() * 255);
+            const x: u8 = @intFromFloat(clm.x * 255);
+            const y: u8 = @intFromFloat(clm.y * 255);
+            const z: u8 = @intFromFloat(clm.z * 255);
             try w.print("{d} {d} {d}\n", .{ x, y, z });
         }
     }
