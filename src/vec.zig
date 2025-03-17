@@ -51,14 +51,6 @@ pub const V3 = struct {
         };
     }
 
-    pub fn vecMul(self: *const V3, o: V3) V3 {
-        return .{
-            .x = self.x * o.x,
-            .y = self.y * o.y,
-            .z = self.z * o.z,
-        };
-    }
-
     pub fn mul(self: *const V3, v: f64) V3 {
         return .{ .x = self.x * v, .y = self.y * v, .z = self.z * v };
     }
@@ -106,6 +98,44 @@ pub const V3 = struct {
     pub fn nearZero(self: *const V3) bool {
         const tol = 1e-8;
         return @abs(self.x) <= tol and @abs(self.y) <= tol and @abs(self.z) <= tol;
+    }
+
+    pub fn close(self: *const V3, o: V3) bool {
+        return self.sub(o).nearZero();
+    }
+
+    // useful, non-standard operators
+
+    pub fn vmul(self: *const V3, o: V3) V3 {
+        return .{
+            .x = self.x * o.x,
+            .y = self.y * o.y,
+            .z = self.z * o.z,
+        };
+    }
+
+    pub fn vdiv(self: *const V3, o: V3) V3 {
+        return .{
+            .x = self.x / o.x,
+            .y = self.y / o.y,
+            .z = self.z / o.z,
+        };
+    }
+
+    pub fn vmin(self: *const V3, o: V3) V3 {
+        return .{
+            .x = @min(self.x, o.x),
+            .y = @min(self.y, o.y),
+            .z = @min(self.z, o.z),
+        };
+    }
+
+    pub fn vmax(self: *const V3, o: V3) V3 {
+        return .{
+            .x = @max(self.x, o.x),
+            .y = @max(self.y, o.y),
+            .z = @max(self.z, o.z),
+        };
     }
 };
 
