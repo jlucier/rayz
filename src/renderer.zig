@@ -7,6 +7,7 @@ const V3 = vec.V3;
 const Ray = vec.Ray;
 const Hit = hitmod.Hit;
 const Hittable = hitmod.Hittable;
+const BVH = hitmod.BVH;
 
 const DEG_TO_RAD = std.math.pi / 180.0;
 const ASPECT_RATIO = 16.0 / 9.0;
@@ -98,10 +99,10 @@ pub const Camera = struct {
 pub const Tracer = struct {
     camera: Camera,
     img: image.Image,
-    hittables: std.ArrayList(Hittable),
     rng: std.Random.DefaultPrng,
+    bvh: BVH,
     max_bounces: usize = 50,
-    samples_per_px: usize = 100,
+    samples_per_px: usize = 1,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -128,22 +129,22 @@ pub const Tracer = struct {
                 img_w,
             ),
             .img = try image.Image.initEmpty(allocator, height, img_w),
-            .hittables = std.ArrayList(Hittable).init(allocator),
             .rng = std.Random.DefaultPrng.init(blk: {
                 var seed: u64 = undefined;
                 try std.posix.getrandom(std.mem.asBytes(&seed));
                 break :blk seed;
             }),
+            .bvh = BVH.init(allocator, 0),
         };
     }
 
     pub fn deinit(self: *const Tracer) void {
-        self.hittables.deinit();
+        self.bvh.deinit();
         self.img.deinit();
     }
 
     pub fn addObject(self: *Tracer, obj: Hittable) !void {
-        try self.hittables.append(obj);
+        try self.bvh.addHittable(obj);
     }
 
     pub fn render(self: *Tracer) usize {
@@ -162,7 +163,9 @@ pub const Tracer = struct {
                     const ray = self.camera.getRay(i, j, self.rng.random());
                     rays += 1;
 
-                    acc_color = acc_color.add(self.bounceRay(ray, self.max_bounces));
+                    if (i == self.img.w / 2 and j == self.img.h - 1)
+                        std.debug.print("ray: {}\n", .{ray});
+                    acc_color = acc_color.add(self.bounceRay(&ray, self.max_bounces));
                 }
 
                 self.img.pixels[j * self.img.w + i] = //
@@ -174,29 +177,19 @@ pub const Tracer = struct {
         return rays;
     }
 
-    fn findHit(self: *const Tracer, ray: Ray) ?Hit {
-        var maybe_hit: ?Hit = null;
-        for (self.hittables.items) |obj| {
-            const maxt = if (maybe_hit) |hit| hit.t else std.math.inf(f64);
-
-            if (obj.hit(obj.ptr, &ray, 1e-10, maxt)) |new_hit| {
-                maybe_hit = new_hit;
-            }
-        }
-        return maybe_hit;
-    }
-
-    fn bounceRay(self: *Tracer, ray: Ray, depth: usize) V3 {
+    fn bounceRay(self: *Tracer, ray: *const Ray, depth: usize) V3 {
         if (depth == 0)
             return V3{};
 
-        if (self.findHit(ray)) |hit| {
+        if (self.bvh.findHit(ray, 1e-10, std.math.inf(f64))) |hit| {
             // bounce light
             var ret = V3{};
-            if (hit.material.scatter(self.rng.random(), &ray, &hit)) |res| {
-                ret = self.bounceRay(res.ray, depth - 1).vecMul(res.attenuation);
+            if (hit.material.scatter(self.rng.random(), ray, &hit)) |res| {
+                ret = self.bounceRay(&res.ray, depth - 1).vmul(res.attenuation);
             }
             return ret;
+        } else {
+            std.debug.print("MISS: {}\n{}\n\n", .{ ray.*, self.bvh.bbox });
         }
         // miss, background gradient
         const t: f64 = 0.5 * (ray.dir.unit().y + 1.0);
