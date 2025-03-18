@@ -102,7 +102,8 @@ pub const Tracer = struct {
     rng: std.Random.DefaultPrng,
     bvh: BVH,
     max_bounces: usize = 50,
-    samples_per_px: usize = 1,
+    samples_per_px: usize = 10,
+    hittables: std.ArrayList(Hittable),
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -135,6 +136,7 @@ pub const Tracer = struct {
                 break :blk seed;
             }),
             .bvh = BVH.init(allocator, 0),
+            .hittables = std.ArrayList(Hittable).init(allocator),
         };
     }
 
@@ -144,6 +146,7 @@ pub const Tracer = struct {
     }
 
     pub fn addObject(self: *Tracer, obj: Hittable) !void {
+        try self.hittables.append(obj);
         try self.bvh.addHittable(obj);
     }
 
@@ -162,9 +165,6 @@ pub const Tracer = struct {
                 while (r < self.samples_per_px) : (r += 1) {
                     const ray = self.camera.getRay(i, j, self.rng.random());
                     rays += 1;
-
-                    if (i == self.img.w / 2 and j == self.img.h - 1)
-                        std.debug.print("ray: {}\n", .{ray});
                     acc_color = acc_color.add(self.bounceRay(&ray, self.max_bounces));
                 }
 
@@ -181,7 +181,7 @@ pub const Tracer = struct {
         if (depth == 0)
             return V3{};
 
-        if (self.bvh.findHit(ray, 1e-10, std.math.inf(f64))) |hit| {
+        if (self.findHit(ray)) |hit| {
             // bounce light
             var ret = V3{};
             if (hit.material.scatter(self.rng.random(), ray, &hit)) |res| {
@@ -189,11 +189,24 @@ pub const Tracer = struct {
             }
             return ret;
         } else {
-            std.debug.print("MISS: {}\n{}\n\n", .{ ray.*, self.bvh.bbox });
+            // std.debug.print("MISS: {}\n{}\n\n", .{ ray.*, self.bvh.bbox });
         }
         // miss, background gradient
         const t: f64 = 0.5 * (ray.dir.unit().y + 1.0);
         return V3.ones().mul(1.0 - t).add(V3{ .x = 0.5, .y = 0.7, .z = 1.0 }).mul(t);
+    }
+
+    fn findHit(self: *const Tracer, ray: *const Ray) ?Hit {
+        return self.bvh.findHit(ray, 1e-10, std.math.inf(f64));
+        // var maybe_hit: ?Hit = null;
+        // for (self.hittables.items) |*h| {
+        //     const maxt = if (maybe_hit) |ht| ht.t else std.math.inf(f64);
+        //
+        //     if (h.hit(h.ptr, ray, 1e-10, maxt)) |new_hit| {
+        //         maybe_hit = new_hit;
+        //     }
+        // }
+        // return maybe_hit;
     }
 };
 

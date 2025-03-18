@@ -60,12 +60,24 @@ pub const AABB = struct {
         const t0s = self.low.sub(ray.origin).vdiv(ray.dir);
         const t1s = self.high.sub(ray.origin).vdiv(ray.dir);
 
-        // std.debug.print("hit check:\n{}\n{}\n", .{ t0s, t1s });
+        var t0 = tmin;
+        var t1 = tmax;
+        const axes = [_]u8{ 0, 1, 2 };
 
         // reduce all the solutions to the highest min and lowest max -- tightest range
         // (also factor in the provided time range for the hit)
-        const t0 = @max(t0s.x, t0s.y, t0s.z, tmin);
-        const t1 = @min(t1s.x, t1s.y, t1s.z, tmax);
+        for (axes) |ax| {
+            const v0 = t0s.at(ax);
+            const v1 = t1s.at(ax);
+
+            if (v0 < v1) {
+                t0 = @max(v0, t0);
+                t1 = @min(v1, t1);
+            } else {
+                t0 = @max(v1, t0);
+                t1 = @min(v0, t1);
+            }
+        }
 
         // hit if the range is valid
         return t1 > t0;
@@ -78,7 +90,7 @@ pub const BVH = struct {
     children: [2]?*BVH = .{ null, null },
     hittables: std.ArrayList(Hittable),
     split_axis: u8 = 0,
-    max_children: usize = 10,
+    max_children: usize = 4,
 
     pub fn init(allocator: std.mem.Allocator, axis: u8) BVH {
         return .{
@@ -104,20 +116,7 @@ pub const BVH = struct {
     };
 
     fn hittableLess(ctx: SortCtx, a: Hittable, b: Hittable) bool {
-        const av = switch (ctx.split_axis) {
-            0 => a.bbox.low.x,
-            1 => a.bbox.low.y,
-            2 => a.bbox.low.z,
-            else => unreachable,
-        };
-        const bv = switch (ctx.split_axis) {
-            0 => b.bbox.low.x,
-            1 => b.bbox.low.y,
-            2 => b.bbox.low.z,
-            else => unreachable,
-        };
-
-        return av < bv;
+        return a.bbox.low.at(ctx.split_axis) < b.bbox.low.at(ctx.split_axis);
     }
 
     pub fn addHittable(self: *BVH, obj: Hittable) !void {
@@ -139,6 +138,8 @@ pub const BVH = struct {
         }
 
         // subdivide
+        // append first, then sort everything and reassign
+        try self.hittables.append(obj);
 
         std.mem.sort(
             Hittable,
@@ -155,8 +156,7 @@ pub const BVH = struct {
         const mid = self.hittables.items.len / 2;
 
         for (self.hittables.items, 0..) |*h, i| {
-            const node = self.children[i / mid].?;
-            try node.addHittable(h.*);
+            try self.children[if (i < mid) 0 else 1].?.addHittable(h.*);
         }
 
         self.hittables.clearAndFree();
@@ -174,7 +174,7 @@ pub const BVH = struct {
             // have children, check them
             maybe_hit = c0.findHit(ray, tmin, tmax);
 
-            const maxt = if (maybe_hit) |h| h.t else std.math.inf(f64);
+            const maxt = if (maybe_hit) |h| h.t else tmax;
 
             if (self.children[1].?.findHit(ray, tmin, maxt)) |new_hit| {
                 maybe_hit = new_hit;
@@ -184,7 +184,7 @@ pub const BVH = struct {
 
         // no children, check hittables
         for (self.hittables.items) |*h| {
-            const maxt = if (maybe_hit) |ht| ht.t else std.math.inf(f64);
+            const maxt = if (maybe_hit) |ht| ht.t else tmax;
 
             if (h.hit(h.ptr, ray, tmin, maxt)) |new_hit| {
                 maybe_hit = new_hit;
@@ -240,6 +240,20 @@ test "bbox hit" {
     try std.testing.expect(box.hit(&r1, 0, 10));
     try std.testing.expect(!box.hit(&r2, 0, 10));
     try std.testing.expect(box.hit(&r3, 0, 10));
+}
+
+test "bbox hit 2" {
+    const box = AABB.init(
+        .{ .x = -1000, .y = -2000, .z = -1000 },
+        .{ .x = 1000, .y = 2, .z = 1000 },
+    );
+    const r1 = Ray{
+        .origin = vec.V3{ .x = 13, .y = 2, .z = 3 },
+        .dir = vec.V3{ .x = -9.6, .y = -1.5, .z = -2.3 },
+        .time = 0.6,
+    };
+
+    try std.testing.expect(box.hit(&r1, 0, 10));
 }
 
 test "bvh memory management" {

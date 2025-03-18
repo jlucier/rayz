@@ -69,50 +69,50 @@ pub fn main() !void {
 
     // randoms
 
-    // var a: isize = -11;
-    // const rand = tracer.rng.random();
-    // while (a < 11) : (a += 1) {
-    //     var b: isize = -11;
-    //     while (b < 11) : (b += 1) {
-    //         const rand_mat = rand.float(f64);
-    //
-    //         const fa: f64 = @floatFromInt(a);
-    //         const fb: f64 = @floatFromInt(b);
-    //         const center = V3{
-    //             .x = fa + 0.9 * rand.float(f64),
-    //             .y = 0.2,
-    //             .z = fb + 0.9 * rand.float(f64),
-    //         };
-    //
-    //         if (center.sub(V3{ .x = 4, .y = 0.2, .z = 0 }).mag() <= 0.9)
-    //             continue;
-    //
-    //         var sphere_ray = vec.Ray{
-    //             .origin = center,
-    //             .dir = V3{},
-    //         };
-    //         var m = mat.Material{
-    //             .mat_type = .Dielectric,
-    //         };
-    //
-    //         if (rand_mat < 0.8) {
-    //             m.mat_type = .Diffuse;
-    //             m.albedo = V3.random(rand, 0, 1.0).vmul(V3.random(rand, 0, 1.0));
-    //             // moving from center up in y by [0,0.5] over the time window
-    //             sphere_ray.dir = V3.y_hat().mul(rand.float(f64) * 0.5);
-    //         } else if (rand_mat < 0.95) {
-    //             m.mat_type = .Metallic;
-    //             m.albedo = V3.random(rand, 0.5, 1.0);
-    //             m.fuzz = rand.float(f64) * 0.5;
-    //         } else {
-    //             // glass
-    //             m.mat_type = .Dielectric;
-    //             m.refractive_index = 1.5;
-    //         }
-    //
-    //         try spheres.append(.{ .center = sphere_ray, .radius = 0.2, .material = m });
-    //     }
-    // }
+    var a: isize = -11;
+    const rand = tracer.rng.random();
+    while (a < 11) : (a += 1) {
+        var b: isize = -11;
+        while (b < 11) : (b += 1) {
+            const rand_mat = rand.float(f64);
+
+            const fa: f64 = @floatFromInt(a);
+            const fb: f64 = @floatFromInt(b);
+            const center = V3{
+                .x = fa + 0.9 * rand.float(f64),
+                .y = 0.2,
+                .z = fb + 0.9 * rand.float(f64),
+            };
+
+            if (center.sub(V3{ .x = 4, .y = 0.2, .z = 0 }).mag() <= 0.9)
+                continue;
+
+            var sphere_ray = vec.Ray{
+                .origin = center,
+                .dir = V3{},
+            };
+            var m = mat.Material{
+                .mat_type = .Dielectric,
+            };
+
+            if (rand_mat < 0.8) {
+                m.mat_type = .Diffuse;
+                m.albedo = V3.random(rand, 0, 1.0).vmul(V3.random(rand, 0, 1.0));
+                // moving from center up in y by [0,0.5] over the time window
+                sphere_ray.dir = V3.y_hat().mul(rand.float(f64) * 0.5);
+            } else if (rand_mat < 0.95) {
+                m.mat_type = .Metallic;
+                m.albedo = V3.random(rand, 0.5, 1.0);
+                m.fuzz = rand.float(f64) * 0.5;
+            } else {
+                // glass
+                m.mat_type = .Dielectric;
+                m.refractive_index = 1.5;
+            }
+
+            try spheres.append(.{ .center = sphere_ray, .radius = 0.2, .material = m });
+        }
+    }
 
     for (spheres.items) |*s| {
         try tracer.addObject(.{
@@ -128,7 +128,8 @@ pub fn main() !void {
 
     var durr: f64 = @floatFromInt(std.time.Instant.since(try std.time.Instant.now(), st));
     durr /= std.time.ns_per_s;
-    std.debug.print("Finished render: {d:.2} rps and {d:.2} us per ray\n", .{
+    std.debug.print("Finished render ({d:.2}s): {d:.2} rps and {d:.2} us per ray\n", .{
+        durr,
         rays_traced / durr,
         std.time.us_per_s * durr / rays_traced,
     });

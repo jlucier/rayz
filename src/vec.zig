@@ -23,6 +23,15 @@ pub const V3 = struct {
         return V3.of(1);
     }
 
+    pub fn at(self: *const V3, axis: u8) f64 {
+        return switch (axis) {
+            0 => self.x,
+            1 => self.y,
+            2 => self.z,
+            else => unreachable,
+        };
+    }
+
     pub fn x_hat() V3 {
         return V3{ .x = 1, .y = 0, .z = 0 };
     }
