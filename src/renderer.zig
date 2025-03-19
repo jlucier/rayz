@@ -7,6 +7,7 @@ const V3 = vec.V3;
 const Ray = vec.Ray;
 const Hit = hitmod.Hit;
 const Hittable = hitmod.Hittable;
+const HittableList = hitmod.HittableList;
 const BVH = hitmod.BVH;
 
 const DEG_TO_RAD = std.math.pi / 180.0;
@@ -103,7 +104,7 @@ pub const Tracer = struct {
     rng: std.Random.DefaultPrng,
     max_bounces: usize = 50,
     samples_per_px: usize = 10,
-    hittables: std.ArrayList(Hittable),
+    hittables: HittableList,
     bvh: BVH,
 
     pub fn init(
@@ -137,7 +138,7 @@ pub const Tracer = struct {
                 try std.posix.getrandom(std.mem.asBytes(&seed));
                 break :blk seed;
             }),
-            .hittables = std.ArrayList(Hittable).init(allocator),
+            .hittables = HittableList.init(allocator),
             .bvh = BVH.init(allocator),
         };
     }
@@ -183,32 +184,18 @@ pub const Tracer = struct {
         if (depth == 0)
             return V3{};
 
-        if (self.findHit(ray)) |hit| {
+        if (self.bvh.findHit(&self.hittables, ray, 1e-10, std.math.inf(f64))) |hit| {
             // bounce light
             var ret = V3{};
             if (hit.material.scatter(self.rng.random(), ray, &hit)) |res| {
                 ret = self.bounceRay(&res.ray, depth - 1).vmul(res.attenuation);
             }
             return ret;
-        } else {
-            // std.debug.print("MISS: {}\n{}\n\n", .{ ray.*, self.bvh.bbox });
         }
+
         // miss, background gradient
         const t: f64 = 0.5 * (ray.dir.unit().y + 1.0);
         return V3.ones().mul(1.0 - t).add(V3{ .x = 0.5, .y = 0.7, .z = 1.0 }).mul(t);
-    }
-
-    fn findHit(self: *const Tracer, ray: *const Ray) ?Hit {
-        return self.bvh.findHit(&self.hittables, ray, 1e-10, std.math.inf(f64));
-        // var maybe_hit: ?Hit = null;
-        // for (self.hittables.items) |*h| {
-        //     const maxt = if (maybe_hit) |ht| ht.t else std.math.inf(f64);
-        //
-        //     if (h.hit(h.ptr, ray, 1e-10, maxt)) |new_hit| {
-        //         maybe_hit = new_hit;
-        //     }
-        // }
-        // return maybe_hit;
     }
 };
 

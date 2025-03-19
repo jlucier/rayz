@@ -122,8 +122,6 @@ pub fn main() !void {
         });
     }
 
-    try tracer.bvh.print(0);
-
     const st = try std.time.Instant.now();
 
     const rays_traced: f64 = @floatFromInt(try tracer.render());
