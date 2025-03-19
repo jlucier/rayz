@@ -97,13 +97,14 @@ pub const Camera = struct {
 };
 
 pub const Tracer = struct {
+    allocator: std.mem.Allocator,
     camera: Camera,
     img: image.Image,
     rng: std.Random.DefaultPrng,
-    bvh: BVH,
     max_bounces: usize = 50,
     samples_per_px: usize = 10,
     hittables: std.ArrayList(Hittable),
+    bvh: BVH,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -119,6 +120,7 @@ pub const Tracer = struct {
         const height: usize = @intFromFloat(fimg_w / ASPECT_RATIO);
 
         return .{
+            .allocator = allocator,
             .camera = Camera.init(
                 vfov,
                 focus_dist,
@@ -135,8 +137,8 @@ pub const Tracer = struct {
                 try std.posix.getrandom(std.mem.asBytes(&seed));
                 break :blk seed;
             }),
-            .bvh = BVH.init(allocator),
             .hittables = std.ArrayList(Hittable).init(allocator),
+            .bvh = BVH.init(allocator),
         };
     }
 
@@ -147,12 +149,12 @@ pub const Tracer = struct {
 
     pub fn addObject(self: *Tracer, obj: Hittable) !void {
         try self.hittables.append(obj);
-        try self.bvh.addHittable(obj);
     }
 
-    pub fn render(self: *Tracer) usize {
+    pub fn render(self: *Tracer) !usize {
         var rays: usize = 0;
         var j: usize = 0;
+        try self.bvh.build(&self.hittables, 0, self.hittables.items.len);
 
         while (j < self.img.h) : (j += 1) {
             var i: usize = 0;
@@ -197,7 +199,7 @@ pub const Tracer = struct {
     }
 
     fn findHit(self: *const Tracer, ray: *const Ray) ?Hit {
-        return self.bvh.findHit(ray, 1e-10, std.math.inf(f64));
+        return self.bvh.findHit(&self.hittables, ray, 1e-10, std.math.inf(f64));
         // var maybe_hit: ?Hit = null;
         // for (self.hittables.items) |*h| {
         //     const maxt = if (maybe_hit) |ht| ht.t else std.math.inf(f64);

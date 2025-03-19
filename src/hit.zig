@@ -11,6 +11,8 @@ pub const Hittable = struct {
     hit: *const fn (ptr: *const anyopaque, ray: *const Ray, tmin: f64, tmax: f64) ?Hit,
 };
 
+pub const HittableList = std.ArrayList(Hittable);
+
 pub const Hit = struct {
     point: V3,
     normal: V3,
@@ -91,15 +93,13 @@ pub const AABB = struct {
 pub const BVH = struct {
     allocator: std.mem.Allocator,
     bbox: AABB = .{},
-    children: [2]?*BVH = .{ null, null },
-    hittables: std.ArrayList(Hittable),
-    max_children: usize = 1,
+    starti: usize = 0,
+    endi: usize = 0,
+    left: ?*BVH = null,
+    right: ?*BVH = null,
 
     pub fn init(allocator: std.mem.Allocator) BVH {
-        return .{
-            .allocator = allocator,
-            .hittables = std.ArrayList(Hittable).init(allocator),
-        };
+        return .{ .allocator = allocator };
     }
 
     pub fn deinit(self: *const BVH) void {
@@ -109,8 +109,6 @@ pub const BVH = struct {
                 self.allocator.destroy(c);
             }
         }
-
-        self.hittables.deinit();
     }
 
     const SortCtx = struct {
@@ -121,46 +119,37 @@ pub const BVH = struct {
         return a.bbox.low.at(ctx.split_axis) < b.bbox.low.at(ctx.split_axis);
     }
 
-    pub fn addHittable(self: *BVH, obj: Hittable) !void {
-        // update bbox to include this node (always needed)
-        self.bbox = AABB.enclose(self.bbox, obj.bbox);
+    pub fn build(self: *BVH, hittables: *HittableList, si: usize, ei: usize) !void {
+        const nobjs = ei - si;
+        std.debug.assert(nobjs > 0);
 
-        if (self.children[0] != null) {
-            // has children, add to child nearest the object
-            const oc = obj.bbox.center();
-            const d0 = self.children[0].?.bbox.center().sub(oc).mag();
-            const d1 = self.children[1].?.bbox.center().sub(oc).mag();
-
-            try self.children[if (d0 < d1) 0 else 1].?.addHittable(obj);
-            return;
-        } else if (self.hittables.items.len + 1 <= self.max_children) {
-            // add and exit
-            try self.hittables.append(obj);
-            return;
+        // enclose all bboxes
+        for (hittables.items[si..ei]) |*h| {
+            self.bbox = AABB.enclose(self.bbox, h.bbox);
         }
 
-        // subdivide
-        // append first, then sort everything and reassign
-        try self.hittables.append(obj);
+        if (nobjs <= 2) {
+            // I myself will own these and will not subdivide
+            self.starti = si;
+            self.endi = ei;
+        } else {
+            // subdivide
+            std.mem.sort(
+                Hittable,
+                hittables.items[si..ei],
+                SortCtx{ .split_axis = self.bbox.longestAxis() },
+                hittableLess,
+            );
 
-        std.mem.sort(
-            Hittable,
-            self.hittables.items,
-            SortCtx{ .split_axis = self.bbox.longestAxis() },
-            hittableLess,
-        );
+            self.left = try self.allocator.create(BVH);
+            self.right = try self.allocator.create(BVH);
+            self.left.?.* = BVH.init(self.allocator);
+            self.right.?.* = BVH.init(self.allocator);
 
-        self.children[0] = try self.allocator.create(BVH);
-        self.children[1] = try self.allocator.create(BVH);
-        self.children[0].?.* = BVH.init(self.allocator);
-        self.children[1].?.* = BVH.init(self.allocator);
-        const mid = self.hittables.items.len / 2;
-
-        for (self.hittables.items, 0..) |*h, i| {
-            try self.children[if (i < mid) 0 else 1].?.addHittable(h.*);
+            const mid = nobjs / 2 + si;
+            try self.left.?.build(hittables, si, mid);
+            try self.right.?.build(hittables, mid, ei);
         }
-
-        self.hittables.clearAndFree();
     }
 
     pub fn print(self: *const BVH, d: usize) !void {
@@ -172,16 +161,22 @@ pub const BVH = struct {
 
         std.debug.print("{s}Node ({} - {d})\n", .{
             prefix,
-            self.children[0] != null,
-            self.hittables.items.len,
+            self.left != null,
+            self.endi - self.starti,
         });
-        if (self.children[0] != null) {
-            try self.children[0].?.print(d + 1);
-            try self.children[1].?.print(d + 1);
+        if (self.left != null) {
+            try self.left.?.print(d + 1);
+            try self.right.?.print(d + 1);
         }
     }
 
-    pub fn findHit(self: *const BVH, ray: *const Ray, tmin: f64, tmax: f64) ?Hit {
+    pub fn findHit(
+        self: *const BVH,
+        hittables: *const HittableList,
+        ray: *const Ray,
+        tmin: f64,
+        tmax: f64,
+    ) ?Hit {
         if (!self.bbox.hit(ray, tmin, tmax)) {
             return null;
         }
@@ -189,20 +184,20 @@ pub const BVH = struct {
         // might hit something
         var maybe_hit: ?Hit = null;
 
-        if (self.children[0]) |c0| {
+        if (self.left != null) {
             // have children, check them
-            maybe_hit = c0.findHit(ray, tmin, tmax);
+            maybe_hit = self.left.?.findHit(hittables, ray, tmin, tmax);
 
             const maxt = if (maybe_hit) |h| h.t else tmax;
 
-            if (self.children[1].?.findHit(ray, tmin, maxt)) |new_hit| {
+            if (self.right.?.findHit(hittables, ray, tmin, maxt)) |new_hit| {
                 maybe_hit = new_hit;
             }
             return maybe_hit;
         }
 
         // no children, check hittables
-        for (self.hittables.items) |*h| {
+        for (hittables.items[self.starti..self.endi]) |*h| {
             const maxt = if (maybe_hit) |ht| ht.t else tmax;
 
             if (h.hit(h.ptr, ray, tmin, maxt)) |new_hit| {
@@ -293,7 +288,7 @@ test "bvh memory management" {
     var bvh = BVH.init(alloc, 0);
     defer bvh.deinit();
 
-    bvh.children[0] = inner;
+    bvh.left = inner;
 }
 
 test "bvh hit" {

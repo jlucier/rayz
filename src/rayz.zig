@@ -126,7 +126,7 @@ pub fn main() !void {
 
     const st = try std.time.Instant.now();
 
-    const rays_traced: f64 = @floatFromInt(tracer.render());
+    const rays_traced: f64 = @floatFromInt(try tracer.render());
 
     var durr: f64 = @floatFromInt(std.time.Instant.since(try std.time.Instant.now(), st));
     durr /= std.time.ns_per_s;
