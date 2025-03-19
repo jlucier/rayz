@@ -146,6 +146,14 @@ pub const V3 = struct {
             .z = @max(self.z, o.z),
         };
     }
+
+    pub fn amax(self: *const V3) u8 {
+        if (self.x > self.y) {
+            return if (self.x > self.z) 0 else 2;
+        }
+        // we know y >= x
+        return if (self.y > self.z) 1 else 2;
+    }
 };
 
 pub const Ray = struct {
@@ -194,4 +202,14 @@ test "v3 dot+mag+unit" {
     try std.testing.expectApproxEqRel(5.7078, c.mag(), 0.0001);
     try std.testing.expectApproxEqRel(1, c.unit().mag(), 0.0001);
     try std.testing.expectApproxEqRel(1, a.add(b).unit().mag(), 0.0001);
+}
+
+test "amax" {
+    const x = V3{ .x = 10, .y = 2, .z = 0 };
+    const y = V3{ .x = -1, .y = 2, .z = 0 };
+    const z = V3{ .x = -1, .y = 2, .z = 3 };
+
+    try std.testing.expectEqual(0, x.amax());
+    try std.testing.expectEqual(1, y.amax());
+    try std.testing.expectEqual(2, z.amax());
 }

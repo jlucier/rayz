@@ -135,7 +135,7 @@ pub const Tracer = struct {
                 try std.posix.getrandom(std.mem.asBytes(&seed));
                 break :blk seed;
             }),
-            .bvh = BVH.init(allocator, 0),
+            .bvh = BVH.init(allocator),
             .hittables = std.ArrayList(Hittable).init(allocator),
         };
     }

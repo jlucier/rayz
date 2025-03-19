@@ -49,6 +49,10 @@ pub const AABB = struct {
         };
     }
 
+    pub fn longestAxis(self: *const AABB) u8 {
+        return self.high.sub(self.low).amax();
+    }
+
     pub fn center(self: *const AABB) V3 {
         return self.high.sub(self.low).add(self.high);
     }
@@ -89,14 +93,12 @@ pub const BVH = struct {
     bbox: AABB = .{},
     children: [2]?*BVH = .{ null, null },
     hittables: std.ArrayList(Hittable),
-    split_axis: u8 = 0,
-    max_children: usize = 4,
+    max_children: usize = 1,
 
-    pub fn init(allocator: std.mem.Allocator, axis: u8) BVH {
+    pub fn init(allocator: std.mem.Allocator) BVH {
         return .{
             .allocator = allocator,
             .hittables = std.ArrayList(Hittable).init(allocator),
-            .split_axis = axis,
         };
     }
 
@@ -144,15 +146,14 @@ pub const BVH = struct {
         std.mem.sort(
             Hittable,
             self.hittables.items,
-            SortCtx{ .split_axis = self.split_axis },
+            SortCtx{ .split_axis = self.bbox.longestAxis() },
             hittableLess,
         );
 
-        const next_axis = (self.split_axis + 1) % 3;
         self.children[0] = try self.allocator.create(BVH);
         self.children[1] = try self.allocator.create(BVH);
-        self.children[0].?.* = BVH.init(self.allocator, next_axis);
-        self.children[1].?.* = BVH.init(self.allocator, next_axis);
+        self.children[0].?.* = BVH.init(self.allocator);
+        self.children[1].?.* = BVH.init(self.allocator);
         const mid = self.hittables.items.len / 2;
 
         for (self.hittables.items, 0..) |*h, i| {
@@ -160,6 +161,24 @@ pub const BVH = struct {
         }
 
         self.hittables.clearAndFree();
+    }
+
+    pub fn print(self: *const BVH, d: usize) !void {
+        const prefix = try self.allocator.alloc(u8, d);
+        var i: usize = 0;
+        while (i < d) : (i += 1) {
+            prefix[i] = ' ';
+        }
+
+        std.debug.print("{s}Node ({} - {d})\n", .{
+            prefix,
+            self.children[0] != null,
+            self.hittables.items.len,
+        });
+        if (self.children[0] != null) {
+            try self.children[0].?.print(d + 1);
+            try self.children[1].?.print(d + 1);
+        }
     }
 
     pub fn findHit(self: *const BVH, ray: *const Ray, tmin: f64, tmax: f64) ?Hit {
