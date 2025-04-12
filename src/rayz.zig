@@ -58,7 +58,20 @@ fn randomBouncing(allocator: std.mem.Allocator, img_w: usize) !Tracer {
         1000,
         try tracer.pool.addMaterialWithTexture(
             .{ .mat_type = .Diffuse },
-            .{ .tex_type = .SOLID, .color = V3{ .x = 0.5, .y = 0.5, .z = 0.5 } },
+            try mat.Texture.init(
+                allocator,
+                mat.CheckerTexture{
+                    .scale = 0.32,
+                    .even = try mat.Texture.init(
+                        allocator,
+                        mat.SolidTexture{ .color = .{ .x = 0.2, .y = 0.3, .z = 0.1 } },
+                    ),
+                    .odd = try mat.Texture.init(
+                        allocator,
+                        mat.SolidTexture{ .color = V3.of(0.9) },
+                    ),
+                },
+            ),
         ),
     ));
 
@@ -76,7 +89,10 @@ fn randomBouncing(allocator: std.mem.Allocator, img_w: usize) !Tracer {
         1.0,
         try tracer.pool.addMaterialWithTexture(
             .{ .mat_type = .Diffuse },
-            .{ .tex_type = .SOLID, .color = V3{ .x = 0.4, .y = 0.2, .z = 0.1 } },
+            try mat.Texture.init(
+                allocator,
+                mat.SolidTexture{ .color = V3{ .x = 0.4, .y = 0.2, .z = 0.1 } },
+            ),
         ),
     ));
     _ = try tracer.pool.add(Sphere.stationary(
@@ -84,7 +100,10 @@ fn randomBouncing(allocator: std.mem.Allocator, img_w: usize) !Tracer {
         1.0,
         try tracer.pool.addMaterialWithTexture(
             .{ .mat_type = .Metallic },
-            .{ .tex_type = .SOLID, .color = V3{ .x = 0.7, .y = 0.6, .z = 0.5 } },
+            try mat.Texture.init(
+                allocator,
+                mat.SolidTexture{ .color = V3{ .x = 0.7, .y = 0.6, .z = 0.5 } },
+            ),
         ),
     ));
 
@@ -118,18 +137,20 @@ fn randomBouncing(allocator: std.mem.Allocator, img_w: usize) !Tracer {
 
             if (rand_mat < 0.8) {
                 m.mat_type = .Diffuse;
-                m.texture = try tracer.pool.add(mat.Texture{
-                    .tex_type = .SOLID,
-                    .color = V3.random(rand, 0, 1.0).vmul(V3.random(rand, 0, 1.0)),
-                });
+                m.texture = try tracer.pool.add(
+                    try mat.Texture.init(allocator, mat.SolidTexture{
+                        .color = V3.random(rand, 0, 1.0).vmul(V3.random(rand, 0, 1.0)),
+                    }),
+                );
                 // moving from center up in y by [0,0.5] over the time window
                 sphere_ray.dir = V3.y_hat().mul(rand.float(f64) * 0.5);
             } else if (rand_mat < 0.95) {
                 m.mat_type = .Metallic;
-                m.texture = try tracer.pool.add(mat.Texture{
-                    .tex_type = .SOLID,
-                    .color = V3.random(rand, 0.5, 1.0),
-                });
+                m.texture = try tracer.pool.add(
+                    try mat.Texture.init(allocator, mat.SolidTexture{
+                        .color = V3.random(rand, 0.5, 1.0),
+                    }),
+                );
                 m.fuzz = rand.float(f64) * 0.5;
             } else {
                 // glass
@@ -164,7 +185,10 @@ pub fn penultimateScene(allocator: std.mem.Allocator, img_w: usize) !Tracer {
         0.5,
         try tracer.pool.addMaterialWithTexture(
             .{ .mat_type = .Diffuse },
-            .{ .tex_type = .SOLID, .color = .{ .x = 0.1, .y = 0.2, .z = 0.5 } },
+            try mat.Texture.init(
+                allocator,
+                mat.SolidTexture{ .color = .{ .x = 0.1, .y = 0.2, .z = 0.5 } },
+            ),
         ),
     ));
     _ = try tracer.pool.add(Sphere.stationary(
@@ -172,7 +196,10 @@ pub fn penultimateScene(allocator: std.mem.Allocator, img_w: usize) !Tracer {
         100,
         try tracer.pool.addMaterialWithTexture(
             .{ .mat_type = .Diffuse },
-            .{ .tex_type = .SOLID, .color = .{ .x = 0.8, .y = 0.8, .z = 0.0 } },
+            try mat.Texture.init(
+                allocator,
+                mat.SolidTexture{ .color = .{ .x = 0.8, .y = 0.8, .z = 0.0 } },
+            ),
         ),
     ));
 
@@ -201,10 +228,12 @@ pub fn penultimateScene(allocator: std.mem.Allocator, img_w: usize) !Tracer {
         0.5,
         try tracer.pool.addMaterialWithTexture(
             .{ .mat_type = .Metallic, .fuzz = 1.0 },
-            .{
-                .tex_type = .SOLID,
-                .color = .{ .x = 0.8, .y = 0.6, .z = 0.2 },
-            },
+            try mat.Texture.init(
+                allocator,
+                mat.SolidTexture{
+                    .color = .{ .x = 0.8, .y = 0.6, .z = 0.2 },
+                },
+            ),
         ),
     ));
     return tracer;

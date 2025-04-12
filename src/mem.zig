@@ -35,11 +35,12 @@ pub const MemPool = struct {
     }
 
     pub fn add(self: *MemPool, obj: anytype) !usize {
-        var l = switch (@TypeOf(obj)) {
+        const t = @TypeOf(obj);
+        var l = switch (t) {
             mat.Texture => &self.textures,
             mat.Material => &self.materials,
             geom.Sphere => &self.spheres,
-            else => @compileError("Unsupported type"),
+            else => @compileError(@typeName(t)),
         };
         try l.append(obj);
         return l.items.len - 1;

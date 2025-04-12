@@ -8,31 +8,51 @@ const Hit = hitmod.Hit;
 
 // Tex
 
-pub const TextureType = enum {
-    SOLID,
-    CHECKER,
+pub const TextureValueParam = struct {
+    u: f64,
+    v: f64,
+    point: V3,
 };
 
 pub const Texture = struct {
-    tex_type: TextureType,
-    // solid
-    color: V3 = .{},
-    // checker
-    secondary: V3 = .{},
+    ptr: *const anyopaque,
+    valueFn: *const fn (ptr: *const anyopaque, args: TextureValueParam) V3,
 
-    pub fn value(self: *const Texture, u: f64, v: f64, point: V3) V3 {
-        return switch (self.tex_type) {
-            .SOLID => self.solidValue(u, v, point),
-            .CHECKER => self.checkerValue(u, v, point),
+    pub fn init(allocator: std.mem.Allocator, obj: anytype) !Texture {
+        const ptr = try allocator.create(@TypeOf(obj));
+        ptr.* = obj;
+        return .{
+            .ptr = ptr,
+            .valueFn = @TypeOf(obj).value,
         };
     }
 
-    fn solidValue(self: *const Texture, _: f64, _: f64, _: V3) V3 {
+    pub fn value(self: *const Texture, args: TextureValueParam) V3 {
+        return self.valueFn(self.ptr, args);
+    }
+};
+
+pub const SolidTexture = struct {
+    color: V3,
+
+    pub fn value(ptr: *const anyopaque, _: TextureValueParam) V3 {
+        const self: *const SolidTexture = @ptrCast(@alignCast(ptr));
         return self.color;
     }
+};
 
-    fn checkerValue(self: *const Texture, _: f64, _: f64, _: V3) V3 {
-        return self.color;
+pub const CheckerTexture = struct {
+    scale: f64,
+    even: Texture,
+    odd: Texture,
+
+    pub fn value(ptr: *const anyopaque, args: TextureValueParam) V3 {
+        const self: *const CheckerTexture = @ptrCast(@alignCast(ptr));
+        const x: i64 = @intFromFloat(@floor(args.point.x / self.scale));
+        const y: i64 = @intFromFloat(@floor(args.point.y / self.scale));
+        const z: i64 = @intFromFloat(@floor(args.point.z / self.scale));
+        const t = if (@mod(x + y + z, 2) == 0) &self.even else &self.odd;
+        return t.value(args);
     }
 };
 
@@ -101,11 +121,7 @@ pub const Material = struct {
                 .dir = target.sub(args.hit.point),
                 .time = args.ray.time,
             },
-            .attenuation = args.textures[self.texture].value(
-                args.hit.u,
-                args.hit.v,
-                args.hit.point,
-            ),
+            .attenuation = self.attenuation(args),
         };
     }
 
@@ -125,11 +141,7 @@ pub const Material = struct {
                 .dir = reflection_dir,
                 .time = args.ray.time,
             },
-            .attenuation = args.textures[self.texture].value(
-                args.hit.u,
-                args.hit.v,
-                args.hit.point,
-            ),
+            .attenuation = self.attenuation(args),
         };
     }
     pub fn scatterDielectric(self: *const Material, args: ScatterParam) ?ScatterResult {
@@ -154,6 +166,14 @@ pub const Material = struct {
             },
             .attenuation = V3.ones(),
         };
+    }
+
+    fn attenuation(self: *const Material, args: ScatterParam) V3 {
+        return args.textures[self.texture].value(.{
+            .u = args.hit.u,
+            .v = args.hit.v,
+            .point = args.hit.point,
+        });
     }
 };
 
