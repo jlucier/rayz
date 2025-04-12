@@ -18,6 +18,30 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
+    var tracer = try randomBouncing(allocator, img_w);
+
+    const st = try std.time.Instant.now();
+
+    const rays_traced: f64 = @floatFromInt(try tracer.render());
+
+    var durr: f64 = @floatFromInt(std.time.Instant.since(try std.time.Instant.now(), st));
+    durr /= std.time.ns_per_s;
+    std.debug.print("Finished render ({d:.2}s): {d:.2} rps and {d:.2} us per ray\n", .{
+        durr,
+        rays_traced / durr,
+        std.time.us_per_s * durr / rays_traced,
+    });
+
+    if (args.next()) |out_fname| {
+        const f = try std.fs.cwd().createFile(out_fname, .{ .read = false, .truncate = true });
+        defer f.close();
+        try tracer.img.writePPM(f);
+    } else {
+        try tracer.img.writePPM(std.io.getStdOut());
+    }
+}
+
+fn randomBouncing(allocator: std.mem.Allocator, img_w: usize) !Tracer {
     var tracer = try Tracer.init(
         allocator,
         img_w,
@@ -28,43 +52,40 @@ pub fn main() !void {
         V3{}, // look_at
         V3.y_hat(), // vup
     );
-
-    var spheres = std.ArrayList(Sphere).init(allocator);
-
     // ground
-    try spheres.append(Sphere.stationary(
+    _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = 0, .y = -1000, .z = 0 },
         1000,
-        .{
-            .mat_type = .Diffuse,
-            .albedo = V3{ .x = 0.5, .y = 0.5, .z = 0.5 },
-        },
+        try tracer.pool.addMaterialWithTexture(
+            .{ .mat_type = .Diffuse },
+            .{ .tex_type = .SOLID, .color = V3{ .x = 0.5, .y = 0.5, .z = 0.5 } },
+        ),
     ));
 
     // main 3
-    try spheres.append(Sphere.stationary(
+    _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = 0, .y = 1, .z = 0 },
         1.0,
-        .{
+        try tracer.pool.add(mat.Material{
             .mat_type = .Dielectric,
             .refractive_index = 1.5,
-        },
+        }),
     ));
-    try spheres.append(Sphere.stationary(
+    _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = -4, .y = 1, .z = 0 },
         1.0,
-        .{
-            .mat_type = .Diffuse,
-            .albedo = V3{ .x = 0.4, .y = 0.2, .z = 0.1 },
-        },
+        try tracer.pool.addMaterialWithTexture(
+            .{ .mat_type = .Diffuse },
+            .{ .tex_type = .SOLID, .color = V3{ .x = 0.4, .y = 0.2, .z = 0.1 } },
+        ),
     ));
-    try spheres.append(Sphere.stationary(
+    _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = 4, .y = 1, .z = 0 },
         1.0,
-        .{
-            .mat_type = .Metallic,
-            .albedo = V3{ .x = 0.7, .y = 0.6, .z = 0.5 },
-        },
+        try tracer.pool.addMaterialWithTexture(
+            .{ .mat_type = .Metallic },
+            .{ .tex_type = .SOLID, .color = V3{ .x = 0.7, .y = 0.6, .z = 0.5 } },
+        ),
     ));
 
     // randoms
@@ -97,12 +118,18 @@ pub fn main() !void {
 
             if (rand_mat < 0.8) {
                 m.mat_type = .Diffuse;
-                m.albedo = V3.random(rand, 0, 1.0).vmul(V3.random(rand, 0, 1.0));
+                m.texture = try tracer.pool.add(mat.Texture{
+                    .tex_type = .SOLID,
+                    .color = V3.random(rand, 0, 1.0).vmul(V3.random(rand, 0, 1.0)),
+                });
                 // moving from center up in y by [0,0.5] over the time window
                 sphere_ray.dir = V3.y_hat().mul(rand.float(f64) * 0.5);
             } else if (rand_mat < 0.95) {
                 m.mat_type = .Metallic;
-                m.albedo = V3.random(rand, 0.5, 1.0);
+                m.texture = try tracer.pool.add(mat.Texture{
+                    .tex_type = .SOLID,
+                    .color = V3.random(rand, 0.5, 1.0),
+                });
                 m.fuzz = rand.float(f64) * 0.5;
             } else {
                 // glass
@@ -110,40 +137,17 @@ pub fn main() !void {
                 m.refractive_index = 1.5;
             }
 
-            try spheres.append(.{ .center = sphere_ray, .radius = 0.2, .material = m });
+            _ = try tracer.pool.add(Sphere{
+                .center = sphere_ray,
+                .radius = 0.2,
+                .material = try tracer.pool.add(m),
+            });
         }
     }
-
-    for (spheres.items) |*s| {
-        try tracer.addObject(.{
-            .ptr = s,
-            .hit = geom.Sphere.hit,
-            .bbox = s.boundingBox(),
-        });
-    }
-
-    const st = try std.time.Instant.now();
-
-    const rays_traced: f64 = @floatFromInt(try tracer.render());
-
-    var durr: f64 = @floatFromInt(std.time.Instant.since(try std.time.Instant.now(), st));
-    durr /= std.time.ns_per_s;
-    std.debug.print("Finished render ({d:.2}s): {d:.2} rps and {d:.2} us per ray\n", .{
-        durr,
-        rays_traced / durr,
-        std.time.us_per_s * durr / rays_traced,
-    });
-
-    if (args.next()) |out_fname| {
-        const f = try std.fs.cwd().createFile(out_fname, .{ .read = false, .truncate = true });
-        defer f.close();
-        try tracer.img.writePPM(f);
-    } else {
-        try tracer.img.writePPM(std.io.getStdOut());
-    }
+    return tracer;
 }
 
-pub fn penultimate_scene(allocator: std.mem.Allocator, img_w: usize) void {
+pub fn penultimateScene(allocator: std.mem.Allocator, img_w: usize) !Tracer {
     var tracer = try Tracer.init(
         allocator,
         img_w,
@@ -155,53 +159,53 @@ pub fn penultimate_scene(allocator: std.mem.Allocator, img_w: usize) void {
         V3.y_hat(), // vup
     );
 
-    const spheres = [_]geom.Sphere{
-        .{
-            .center = V3{ .x = 0, .y = 0, .z = -1.2 },
-            .radius = 0.5,
-            .material = .{
-                .mat_type = .Diffuse,
-                .albedo = V3{ .x = 0.1, .y = 0.2, .z = 0.5 },
-            },
-        },
-        .{
-            .center = V3{ .x = 0, .y = -100.5, .z = -1 },
-            .radius = 100,
-            .material = .{
-                .mat_type = .Diffuse,
-                .albedo = V3{ .x = 0.8, .y = 0.8, .z = 0.0 },
-            },
-        },
-        // left outer
-        .{
-            .center = V3{ .x = -1, .y = 0, .z = -1 },
-            .radius = 0.5,
-            .material = .{
-                .mat_type = .Dielectric,
-                .refractive_index = 1.5,
-            },
-        },
-        // left inner bubble
-        .{
-            .center = V3{ .x = -1, .y = 0, .z = -1 },
-            .radius = 0.4,
-            .material = .{
-                .mat_type = .Dielectric,
-                .refractive_index = 1.0 / 1.5,
-            },
-        },
-        .{
-            .center = V3{ .x = 1, .y = 0, .z = -1 },
-            .radius = 0.5,
-            .material = .{
-                .mat_type = .Metallic,
-                .albedo = V3{ .x = 0.8, .y = 0.6, .z = 0.2 },
-                .fuzz = 1.0,
-            },
-        },
-    };
+    _ = try tracer.pool.add(Sphere.stationary(
+        .{ .x = 0, .y = 0, .z = -1.2 },
+        0.5,
+        try tracer.pool.addMaterialWithTexture(
+            .{ .mat_type = .Diffuse },
+            .{ .tex_type = .SOLID, .color = .{ .x = 0.1, .y = 0.2, .z = 0.5 } },
+        ),
+    ));
+    _ = try tracer.pool.add(Sphere.stationary(
+        .{ .x = 0, .y = -100.5, .z = -1 },
+        100,
+        try tracer.pool.addMaterialWithTexture(
+            .{ .mat_type = .Diffuse },
+            .{ .tex_type = .SOLID, .color = .{ .x = 0.8, .y = 0.8, .z = 0.0 } },
+        ),
+    ));
 
-    for (&spheres) |*s| {
-        try tracer.addObject(.{ .ptr = s, .hit = geom.Sphere.hit });
-    }
+    // left outer
+    _ = try tracer.pool.add(Sphere.stationary(
+        .{ .x = -1, .y = 0, .z = -1 },
+        0.5,
+        try tracer.pool.add(mat.Material{
+            .mat_type = .Dielectric,
+            .refractive_index = 1.5,
+        }),
+    ));
+
+    // left inner bubble
+    _ = try tracer.pool.add(Sphere.stationary(
+        .{ .x = -1, .y = 0, .z = -1 },
+        0.4,
+        try tracer.pool.add(mat.Material{
+            .mat_type = .Dielectric,
+            .refractive_index = 1.0 / 1.5,
+        }),
+    ));
+
+    _ = try tracer.pool.add(Sphere.stationary(
+        .{ .x = 1, .y = 0, .z = -1 },
+        0.5,
+        try tracer.pool.addMaterialWithTexture(
+            .{ .mat_type = .Metallic, .fuzz = 1.0 },
+            .{
+                .tex_type = .SOLID,
+                .color = .{ .x = 0.8, .y = 0.6, .z = 0.2 },
+            },
+        ),
+    ));
+    return tracer;
 }

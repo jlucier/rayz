@@ -1,6 +1,5 @@
 const std = @import("std");
 const vec = @import("./vec.zig");
-const mat = @import("./material.zig");
 
 const Ray = vec.Ray;
 const V3 = vec.V3;
@@ -17,10 +16,12 @@ pub const Hit = struct {
     point: V3,
     normal: V3,
     t: f64,
+    u: f64 = 0,
+    v: f64 = 0,
     front_face: bool,
-    material: mat.Material,
+    material: usize,
 
-    pub fn init(ray: *const Ray, point: V3, normal: V3, t: f64, material: mat.Material) Hit {
+    pub fn init(ray: *const Ray, point: V3, normal: V3, t: f64, material: usize) Hit {
         // ray is hitting front if it points against normal dir, otherwise back face
         const front_face = normal.dot(ray.dir) < 0;
         return .{
@@ -219,7 +220,7 @@ const DummyHittable = struct {
                 .normal = V3{},
                 .t = 0,
                 .front_face = true,
-                .material = .{ .mat_type = .Dielectric },
+                .material = 0,
             };
         }
         return null;

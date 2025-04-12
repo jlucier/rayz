@@ -6,6 +6,45 @@ const V3 = vec.V3;
 const Ray = vec.Ray;
 const Hit = hitmod.Hit;
 
+// Tex
+
+pub const TextureType = enum {
+    SOLID,
+    CHECKER,
+};
+
+pub const Texture = struct {
+    tex_type: TextureType,
+    // solid
+    color: V3 = .{},
+    // checker
+    secondary: V3 = .{},
+
+    pub fn value(self: *const Texture, u: f64, v: f64, point: V3) V3 {
+        return switch (self.tex_type) {
+            .SOLID => self.solidValue(u, v, point),
+            .CHECKER => self.checkerValue(u, v, point),
+        };
+    }
+
+    fn solidValue(self: *const Texture, _: f64, _: f64, _: V3) V3 {
+        return self.color;
+    }
+
+    fn checkerValue(self: *const Texture, _: f64, _: f64, _: V3) V3 {
+        return self.color;
+    }
+};
+
+// Mat
+
+pub const ScatterParam = struct {
+    random: std.Random,
+    ray: *const Ray,
+    hit: *const Hit,
+    textures: []const Texture,
+};
+
 pub const ScatterResult = struct {
     ray: Ray,
     attenuation: V3,
@@ -25,101 +64,93 @@ pub const DiffuseScatterMethod = enum {
 
 pub const Material = struct {
     mat_type: MaterialType,
-
-    // metallic + diffuse
-    albedo: V3 = V3.of(0.5),
     // diffuse only
     method: DiffuseScatterMethod = .HEMISPHERE,
     // metallic only
     fuzz: f64 = 0,
     // dielectric only
     refractive_index: f64 = 1.0,
+    // metallic + diffuse
+    texture: usize = 0,
 
     pub fn scatter(
         self: *const Material,
-        random: std.Random,
-        ray: *const Ray,
-        hit: *const Hit,
+        args: ScatterParam,
     ) ?ScatterResult {
         return switch (self.mat_type) {
-            .Diffuse => self.scatterDiffuse(random, ray, hit),
-            .Metallic => self.scatterMetallic(random, ray, hit),
-            .Dielectric => self.scatterDielectric(random, ray, hit),
+            .Diffuse => self.scatterDiffuse(args),
+            .Metallic => self.scatterMetallic(args),
+            .Dielectric => self.scatterDielectric(args),
         };
     }
 
-    pub fn scatterDiffuse(
-        self: *const Material,
-        random: std.Random,
-        ray: *const Ray,
-        hit: *const Hit,
-    ) ScatterResult {
+    pub fn scatterDiffuse(self: *const Material, args: ScatterParam) ScatterResult {
         var target = switch (self.method) {
-            .UNIT_SPHERE => hit.point.add(hit.normal).add(randomInUnitSphere(random)),
-            .UNIT_SPHERE_SURFACE => hit.point.add(hit.normal).add(randomUnit(random)),
-            .HEMISPHERE => hit.point.add(randomInHemisphere(random, hit.normal)),
+            .UNIT_SPHERE => args.hit.point.add(args.hit.normal).add(
+                randomInUnitSphere(args.random),
+            ),
+            .UNIT_SPHERE_SURFACE => args.hit.point.add(args.hit.normal).add(randomUnit(args.random)),
+            .HEMISPHERE => args.hit.point.add(randomInHemisphere(args.random, args.hit.normal)),
         };
         if (target.nearZero())
-            target = hit.normal;
+            target = args.hit.normal;
 
         return .{
             .ray = .{
-                .origin = hit.point,
-                .dir = target.sub(hit.point),
-                .time = ray.time,
+                .origin = args.hit.point,
+                .dir = target.sub(args.hit.point),
+                .time = args.ray.time,
             },
-            .attenuation = self.albedo,
+            .attenuation = args.textures[self.texture].value(
+                args.hit.u,
+                args.hit.v,
+                args.hit.point,
+            ),
         };
     }
 
-    pub fn scatterMetallic(
-        self: *const Material,
-        random: std.Random,
-        ray: *const Ray,
-        hit: *const Hit,
-    ) ?ScatterResult {
-        var reflection_dir = reflect(ray, hit).unit();
+    pub fn scatterMetallic(self: *const Material, args: ScatterParam) ?ScatterResult {
+        var reflection_dir = reflect(args.ray, args.hit).unit();
         if (self.fuzz > 0) {
             reflection_dir = reflection_dir.add(
-                randomUnit(random).mul(@min(self.fuzz, 1)),
+                randomUnit(args.random).mul(@min(self.fuzz, 1)),
             );
         }
 
-        if (reflection_dir.dot(hit.normal) <= 0)
+        if (reflection_dir.dot(args.hit.normal) <= 0)
             return null;
         return .{
             .ray = .{
-                .origin = hit.point,
+                .origin = args.hit.point,
                 .dir = reflection_dir,
-                .time = ray.time,
+                .time = args.ray.time,
             },
-            .attenuation = self.albedo,
+            .attenuation = args.textures[self.texture].value(
+                args.hit.u,
+                args.hit.v,
+                args.hit.point,
+            ),
         };
     }
-    pub fn scatterDielectric(
-        self: *const Material,
-        random: std.Random,
-        ray: *const Ray,
-        hit: *const Hit,
-    ) ?ScatterResult {
-        const eta = if (hit.front_face) 1 / self.refractive_index else self.refractive_index;
-        const unit_dir = ray.dir.unit();
+    pub fn scatterDielectric(self: *const Material, args: ScatterParam) ?ScatterResult {
+        const eta = if (args.hit.front_face) 1 / self.refractive_index else self.refractive_index;
+        const unit_dir = args.ray.dir.unit();
 
-        const cos_theta = unit_dir.mul(-1).dot(hit.normal);
+        const cos_theta = unit_dir.mul(-1).dot(args.hit.normal);
         const sin_theta = @sqrt(1 - cos_theta * cos_theta);
 
         var dir = V3{};
-        if (eta * sin_theta > 1.0 or reflectance(cos_theta, eta) > random.float(f64)) {
-            dir = reflect(ray, hit);
+        if (eta * sin_theta > 1.0 or reflectance(cos_theta, eta) > args.random.float(f64)) {
+            dir = reflect(args.ray, args.hit);
         } else {
             // refract
-            dir = refract(unit_dir, hit.normal, eta);
+            dir = refract(unit_dir, args.hit.normal, eta);
         }
         return .{
             .ray = .{
-                .origin = hit.point,
+                .origin = args.hit.point,
                 .dir = dir,
-                .time = ray.time,
+                .time = args.ray.time,
             },
             .attenuation = V3.ones(),
         };

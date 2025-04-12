@@ -1,7 +1,6 @@
 const std = @import("std");
 const vec = @import("./vec.zig");
 const hit = @import("./hit.zig");
-const mat = @import("./material.zig");
 
 const AABB = hit.AABB;
 const Hit = hit.Hit;
@@ -11,9 +10,9 @@ const Ray = vec.Ray;
 pub const Sphere = struct {
     center: Ray,
     radius: f64,
-    material: mat.Material,
+    material: usize,
 
-    pub fn stationary(center: V3, radius: f64, material: mat.Material) Sphere {
+    pub fn stationary(center: V3, radius: f64, material: usize) Sphere {
         return .{
             .center = .{ .origin = center, .dir = .{} },
             .radius = radius,
