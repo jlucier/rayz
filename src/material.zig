@@ -1,6 +1,7 @@
 const std = @import("std");
 const vec = @import("./vec.zig");
 const hitmod = @import("./hit.zig");
+const ecs = @import("./ecs.zig");
 
 const V3 = vec.V3;
 const Ray = vec.Ray;
@@ -12,47 +13,40 @@ pub const TextureValueParam = struct {
     u: f64,
     v: f64,
     point: V3,
-};
-
-pub const Texture = struct {
-    ptr: *const anyopaque,
-    valueFn: *const fn (ptr: *const anyopaque, args: TextureValueParam) V3,
-
-    pub fn init(allocator: std.mem.Allocator, obj: anytype) !Texture {
-        const ptr = try allocator.create(@TypeOf(obj));
-        ptr.* = obj;
-        return .{
-            .ptr = ptr,
-            .valueFn = @TypeOf(obj).value,
-        };
-    }
-
-    pub fn value(self: *const Texture, args: TextureValueParam) V3 {
-        return self.valueFn(self.ptr, args);
-    }
+    textures: []const Texture,
 };
 
 pub const SolidTexture = struct {
     color: V3,
 
-    pub fn value(ptr: *const anyopaque, _: TextureValueParam) V3 {
-        const self: *const SolidTexture = @ptrCast(@alignCast(ptr));
+    pub fn value(self: *const SolidTexture, _: TextureValueParam) V3 {
         return self.color;
     }
 };
 
 pub const CheckerTexture = struct {
     scale: f64,
-    even: Texture,
-    odd: Texture,
+    even: ecs.TextureHandle,
+    odd: ecs.TextureHandle,
 
-    pub fn value(ptr: *const anyopaque, args: TextureValueParam) V3 {
-        const self: *const CheckerTexture = @ptrCast(@alignCast(ptr));
+    pub fn value(self: *const CheckerTexture, args: TextureValueParam) V3 {
         const x: i64 = @intFromFloat(@floor(args.point.x / self.scale));
         const y: i64 = @intFromFloat(@floor(args.point.y / self.scale));
         const z: i64 = @intFromFloat(@floor(args.point.z / self.scale));
         const t = if (@mod(x + y + z, 2) == 0) &self.even else &self.odd;
-        return t.value(args);
+        return t.get(args.textures).value(args);
+    }
+};
+
+pub const Texture = union(enum) {
+    checker: CheckerTexture,
+    solid: SolidTexture,
+
+    pub fn value(self: *const Texture, args: TextureValueParam) V3 {
+        return switch (self.*) {
+            .checker => self.checker.value(args),
+            .solid => self.solid.value(args),
+        };
     }
 };
 
@@ -70,41 +64,17 @@ pub const ScatterResult = struct {
     attenuation: V3,
 };
 
-pub const MaterialType = enum {
-    Diffuse,
-    Metallic,
-    Dielectric,
-};
-
 pub const DiffuseScatterMethod = enum {
     UNIT_SPHERE,
     UNIT_SPHERE_SURFACE,
     HEMISPHERE,
 };
 
-pub const Material = struct {
-    mat_type: MaterialType,
-    // diffuse only
+pub const DiffuseMaterial = struct {
     method: DiffuseScatterMethod = .HEMISPHERE,
-    // metallic only
-    fuzz: f64 = 0,
-    // dielectric only
-    refractive_index: f64 = 1.0,
-    // metallic + diffuse
-    texture: usize = 0,
+    texture: ecs.TextureHandle,
 
-    pub fn scatter(
-        self: *const Material,
-        args: ScatterParam,
-    ) ?ScatterResult {
-        return switch (self.mat_type) {
-            .Diffuse => self.scatterDiffuse(args),
-            .Metallic => self.scatterMetallic(args),
-            .Dielectric => self.scatterDielectric(args),
-        };
-    }
-
-    pub fn scatterDiffuse(self: *const Material, args: ScatterParam) ScatterResult {
+    pub fn scatter(self: *const DiffuseMaterial, args: ScatterParam) ?ScatterResult {
         var target = switch (self.method) {
             .UNIT_SPHERE => args.hit.point.add(args.hit.normal).add(
                 randomInUnitSphere(args.random),
@@ -121,11 +91,21 @@ pub const Material = struct {
                 .dir = target.sub(args.hit.point),
                 .time = args.ray.time,
             },
-            .attenuation = self.attenuation(args),
+            .attenuation = self.texture.get(args.textures).value(.{
+                .u = args.hit.u,
+                .v = args.hit.v,
+                .point = args.hit.point,
+                .textures = args.textures,
+            }),
         };
     }
+};
 
-    pub fn scatterMetallic(self: *const Material, args: ScatterParam) ?ScatterResult {
+pub const MetallicMaterial = struct {
+    fuzz: f64 = 0,
+    texture: ecs.TextureHandle,
+
+    pub fn scatter(self: *const MetallicMaterial, args: ScatterParam) ?ScatterResult {
         var reflection_dir = reflect(args.ray, args.hit).unit();
         if (self.fuzz > 0) {
             reflection_dir = reflection_dir.add(
@@ -141,10 +121,20 @@ pub const Material = struct {
                 .dir = reflection_dir,
                 .time = args.ray.time,
             },
-            .attenuation = self.attenuation(args),
+            .attenuation = self.texture.get(args.textures).value(.{
+                .u = args.hit.u,
+                .v = args.hit.v,
+                .point = args.hit.point,
+                .textures = args.textures,
+            }),
         };
     }
-    pub fn scatterDielectric(self: *const Material, args: ScatterParam) ?ScatterResult {
+};
+
+pub const DielectricMaterial = struct {
+    refractive_index: f64 = 1.0,
+
+    pub fn scatter(self: *const DielectricMaterial, args: ScatterParam) ScatterResult {
         const eta = if (args.hit.front_face) 1 / self.refractive_index else self.refractive_index;
         const unit_dir = args.ray.dir.unit();
 
@@ -167,13 +157,22 @@ pub const Material = struct {
             .attenuation = V3.ones(),
         };
     }
+};
 
-    fn attenuation(self: *const Material, args: ScatterParam) V3 {
-        return args.textures[self.texture].value(.{
-            .u = args.hit.u,
-            .v = args.hit.v,
-            .point = args.hit.point,
-        });
+pub const Material = union(enum) {
+    diffuse: DiffuseMaterial,
+    metallic: MetallicMaterial,
+    dielectric: DielectricMaterial,
+
+    pub fn scatter(
+        self: *const Material,
+        args: ScatterParam,
+    ) ?ScatterResult {
+        return switch (self.*) {
+            .diffuse => self.diffuse.scatter(args),
+            .metallic => self.metallic.scatter(args),
+            .dielectric => self.dielectric.scatter(args),
+        };
     }
 };
 

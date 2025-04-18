@@ -3,6 +3,22 @@ const mat = @import("./material.zig");
 const geom = @import("./geom.zig");
 const hit = @import("./hit.zig");
 
+pub fn Handle(comptime T: type) type {
+    return struct {
+        idx: usize,
+
+        const Self = @This();
+
+        pub fn get(self: *const Self, storage: []const T) *const T {
+            // TODO add index safety
+            return &storage[self.idx];
+        }
+    };
+}
+
+pub const TextureHandle = Handle(mat.Texture);
+pub const MaterialHandle = Handle(mat.Material);
+
 pub const MemPool = struct {
     allocator: std.mem.Allocator,
     spheres: std.ArrayList(geom.Sphere),
@@ -34,25 +50,21 @@ pub const MemPool = struct {
         }
     }
 
-    pub fn add(self: *MemPool, obj: anytype) !usize {
+    pub fn add(self: *MemPool, obj: anytype) !void {
+        _ = try self.addAndReturnHandle(obj);
+    }
+
+    pub fn addAndReturnHandle(self: *MemPool, obj: anytype) !Handle(@TypeOf(obj)) {
         const t = @TypeOf(obj);
         var l = switch (t) {
+            geom.Sphere => &self.spheres,
             mat.Texture => &self.textures,
             mat.Material => &self.materials,
-            geom.Sphere => &self.spheres,
             else => @compileError(@typeName(t)),
         };
         try l.append(obj);
-        return l.items.len - 1;
-    }
-
-    pub fn addMaterialWithTexture(
-        self: *MemPool,
-        material: mat.Material,
-        texture: mat.Texture,
-    ) !usize {
-        var copy = material;
-        copy.texture = try self.add(texture);
-        return try self.add(copy);
+        return .{
+            .idx = l.items.len - 1,
+        };
     }
 };

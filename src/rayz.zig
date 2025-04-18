@@ -3,6 +3,7 @@ const renderer = @import("./renderer.zig");
 const vec = @import("./vec.zig");
 const geom = @import("./geom.zig");
 const mat = @import("./material.zig");
+const ecs = @import("./ecs.zig");
 
 const Tracer = renderer.Tracer;
 const V3 = vec.V3;
@@ -56,55 +57,50 @@ fn randomBouncing(allocator: std.mem.Allocator, img_w: usize) !Tracer {
     _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = 0, .y = -1000, .z = 0 },
         1000,
-        try tracer.pool.addMaterialWithTexture(
-            .{ .mat_type = .Diffuse },
-            try mat.Texture.init(
-                allocator,
-                mat.CheckerTexture{
-                    .scale = 0.32,
-                    .even = try mat.Texture.init(
-                        allocator,
-                        mat.SolidTexture{ .color = .{ .x = 0.2, .y = 0.3, .z = 0.1 } },
-                    ),
-                    .odd = try mat.Texture.init(
-                        allocator,
-                        mat.SolidTexture{ .color = V3.of(0.9) },
-                    ),
-                },
-            ),
-        ),
+        try tracer.pool.addAndReturnHandle(mat.Material{ .diffuse = .{
+            .texture = try tracer.pool.addAndReturnHandle(mat.Texture{ .checker = .{
+                .scale = 0.32,
+                .even = try tracer.pool.addAndReturnHandle(
+                    mat.Texture{
+                        .solid = .{ .color = .{ .x = 0.2, .y = 0.3, .z = 0.1 } },
+                    },
+                ),
+                .odd = try tracer.pool.addAndReturnHandle(
+                    mat.Texture{ .solid = .{ .color = V3.of(0.9) } },
+                ),
+            } }),
+        } }),
     ));
 
     // main 3
-    _ = try tracer.pool.add(Sphere.stationary(
+    try tracer.pool.add(Sphere.stationary(
         .{ .x = 0, .y = 1, .z = 0 },
         1.0,
-        try tracer.pool.add(mat.Material{
-            .mat_type = .Dielectric,
+        try tracer.pool.addAndReturnHandle(mat.Material{ .dielectric = .{
             .refractive_index = 1.5,
-        }),
+        } }),
     ));
-    _ = try tracer.pool.add(Sphere.stationary(
+    try tracer.pool.add(Sphere.stationary(
         .{ .x = -4, .y = 1, .z = 0 },
         1.0,
-        try tracer.pool.addMaterialWithTexture(
-            .{ .mat_type = .Diffuse },
-            try mat.Texture.init(
-                allocator,
-                mat.SolidTexture{ .color = V3{ .x = 0.4, .y = 0.2, .z = 0.1 } },
-            ),
-        ),
+        try tracer.pool.addAndReturnHandle(mat.Material{ .diffuse = .{
+            .texture = try tracer.pool.addAndReturnHandle(mat.Texture{ .solid = .{
+                .color = V3{ .x = 0.4, .y = 0.2, .z = 0.1 },
+            } }),
+        } }),
     ));
-    _ = try tracer.pool.add(Sphere.stationary(
+    try tracer.pool.add(Sphere.stationary(
         .{ .x = 4, .y = 1, .z = 0 },
         1.0,
-        try tracer.pool.addMaterialWithTexture(
-            .{ .mat_type = .Metallic },
-            try mat.Texture.init(
-                allocator,
-                mat.SolidTexture{ .color = V3{ .x = 0.7, .y = 0.6, .z = 0.5 } },
+        try tracer.pool.addAndReturnHandle(mat.Material{ .metallic = .{
+            .texture = try tracer.pool.addAndReturnHandle(
+                mat.Texture{
+                    .solid = .{
+                        .color = V3{ .x = 0.7, .y = 0.6, .z = 0.5 },
+                    },
+                },
             ),
-        ),
+        } }),
     ));
 
     // randoms
@@ -131,37 +127,40 @@ fn randomBouncing(allocator: std.mem.Allocator, img_w: usize) !Tracer {
                 .origin = center,
                 .dir = V3{},
             };
-            var m = mat.Material{
-                .mat_type = .Dielectric,
-            };
+            var m: ?ecs.MaterialHandle = null;
 
             if (rand_mat < 0.8) {
-                m.mat_type = .Diffuse;
-                m.texture = try tracer.pool.add(
-                    try mat.Texture.init(allocator, mat.SolidTexture{
-                        .color = V3.random(rand, 0, 1.0).vmul(V3.random(rand, 0, 1.0)),
-                    }),
-                );
+                m = try tracer.pool.addAndReturnHandle(mat.Material{ .diffuse = .{
+                    .texture = try tracer.pool.addAndReturnHandle(
+                        mat.Texture{
+                            .solid = .{
+                                .color = V3.random(rand, 0, 1.0).vmul(V3.random(rand, 0, 1.0)),
+                            },
+                        },
+                    ),
+                } });
                 // moving from center up in y by [0,0.5] over the time window
                 sphere_ray.dir = V3.y_hat().mul(rand.float(f64) * 0.5);
             } else if (rand_mat < 0.95) {
-                m.mat_type = .Metallic;
-                m.texture = try tracer.pool.add(
-                    try mat.Texture.init(allocator, mat.SolidTexture{
-                        .color = V3.random(rand, 0.5, 1.0),
-                    }),
-                );
-                m.fuzz = rand.float(f64) * 0.5;
+                m = try tracer.pool.addAndReturnHandle(mat.Material{ .metallic = .{
+                    .fuzz = rand.float(f64) * 0.5,
+                    .texture = try tracer.pool.addAndReturnHandle(
+                        mat.Texture{ .solid = .{
+                            .color = V3.random(rand, 0.5, 1.0),
+                        } },
+                    ),
+                } });
             } else {
                 // glass
-                m.mat_type = .Dielectric;
-                m.refractive_index = 1.5;
+                m = try tracer.pool.addAndReturnHandle(mat.Material{ .dielectric = .{
+                    .refractive_index = 1.5,
+                } });
             }
 
             _ = try tracer.pool.add(Sphere{
                 .center = sphere_ray,
                 .radius = 0.2,
-                .material = try tracer.pool.add(m),
+                .material = m.?,
             });
         }
     }

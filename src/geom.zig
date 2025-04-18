@@ -1,6 +1,7 @@
 const std = @import("std");
 const vec = @import("./vec.zig");
 const hit = @import("./hit.zig");
+const ecs = @import("./ecs.zig");
 
 const AABB = hit.AABB;
 const Hit = hit.Hit;
@@ -10,9 +11,9 @@ const Ray = vec.Ray;
 pub const Sphere = struct {
     center: Ray,
     radius: f64,
-    material: usize,
+    material: ecs.MaterialHandle,
 
-    pub fn stationary(center: V3, radius: f64, material: usize) Sphere {
+    pub fn stationary(center: V3, radius: f64, material: ecs.MaterialHandle) Sphere {
         return .{
             .center = .{ .origin = center, .dir = .{} },
             .radius = radius,
@@ -66,16 +67,18 @@ pub const Sphere = struct {
 };
 
 test "sphere bbox" {
-    const stat = Sphere.stationary(.{}, 1, .{ .mat_type = .Dielectric });
-    try std.testing.expect(stat.bbox.low.close(V3.of(-1)));
-    try std.testing.expect(stat.bbox.high.close(V3.ones()));
+    const stat = Sphere.stationary(.{}, 1, .{ .idx = 0 });
+    const s_bbox = stat.boundingBox();
+    try std.testing.expect(s_bbox.low.close(V3.of(-1)));
+    try std.testing.expect(s_bbox.high.close(V3.ones()));
 
-    const move = Sphere.init(
-        .{ .origin = .{}, .dir = V3.ones() },
-        1,
-        .{ .mat_type = .Dielectric },
-    );
+    const move = Sphere{
+        .center = .{ .origin = .{}, .dir = V3.ones() },
+        .radius = 1,
+        .material = .{ .idx = 0 },
+    };
 
-    try std.testing.expect(move.bbox.low.close(V3.of(-1)));
-    try std.testing.expect(move.bbox.high.close(V3.of(2)));
+    const m_bbox = move.boundingBox();
+    try std.testing.expect(m_bbox.low.close(V3.of(-1)));
+    try std.testing.expect(m_bbox.high.close(V3.of(2)));
 }

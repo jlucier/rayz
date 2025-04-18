@@ -4,7 +4,7 @@ const image = @import("./image.zig");
 const hitmod = @import("./hit.zig");
 const mat = @import("./material.zig");
 const Camera = @import("./camera.zig").Camera;
-const MemPool = @import("./mem.zig").MemPool;
+const MemPool = @import("./ecs.zig").MemPool;
 
 const V3 = vec.V3;
 const Ray = vec.Ray;
@@ -107,7 +107,7 @@ pub const Tracer = struct {
         if (self.bvh.findHit(&self.hittables, ray, 1e-10, std.math.inf(f64))) |hit| {
             // bounce light
             var ret = V3{};
-            const m = self.pool.materials.items[hit.material];
+            const m = hit.material.get(self.pool.materials.items);
             const param = mat.ScatterParam{
                 .random = self.rng.random(),
                 .ray = ray,
