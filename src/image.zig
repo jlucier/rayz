@@ -27,7 +27,8 @@ pub const Image = struct {
     }
 
     pub fn writePPM(self: *const Image, f: std.fs.File) !void {
-        const w = f.writer();
+        var buf: [1024]u8 = undefined;
+        var w = f.writer(&buf).interface;
 
         try w.print("P3\n{} {}\n{}\n", .{ self.w, self.h, 255 });
 

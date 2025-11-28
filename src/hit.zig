@@ -11,7 +11,7 @@ pub const Hittable = struct {
     hit: *const fn (ptr: *const anyopaque, ray: *const Ray, tmin: f64, tmax: f64) ?Hit,
 };
 
-pub const HittableList = std.ArrayList(Hittable);
+pub const HittableList = std.array_list.Managed(Hittable);
 
 pub const Hit = struct {
     point: V3,
@@ -284,7 +284,7 @@ test "bbox hit 2" {
 //     var inner = try alloc.create(BVH);
 //     inner.allocator = alloc;
 //     inner.children = .{ null, null };
-//     inner.hittables = std.ArrayList(Hittable).init(alloc);
+//     inner.hittables = std.array_list.Managed(Hittable).init(alloc);
 //
 //     const h = DummyHittable{};
 //     try inner.hittables.append(.{

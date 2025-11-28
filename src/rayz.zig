@@ -38,7 +38,7 @@ pub fn main() !void {
         defer f.close();
         try tracer.img.writePPM(f);
     } else {
-        try tracer.img.writePPM(std.io.getStdOut());
+        try tracer.img.writePPM(std.fs.File.stdout());
     }
 }
 

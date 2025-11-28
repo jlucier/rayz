@@ -21,16 +21,16 @@ pub const MaterialHandle = Handle(mat.Material);
 
 pub const MemPool = struct {
     allocator: std.mem.Allocator,
-    spheres: std.ArrayList(geom.Sphere),
-    materials: std.ArrayList(mat.Material),
-    textures: std.ArrayList(mat.Texture),
+    spheres: std.array_list.Managed(geom.Sphere),
+    materials: std.array_list.Managed(mat.Material),
+    textures: std.array_list.Managed(mat.Texture),
 
     pub fn init(allocator: std.mem.Allocator) MemPool {
         return .{
             .allocator = allocator,
-            .spheres = std.ArrayList(geom.Sphere).init(allocator),
-            .materials = std.ArrayList(mat.Material).init(allocator),
-            .textures = std.ArrayList(mat.Texture).init(allocator),
+            .spheres = std.array_list.Managed(geom.Sphere).init(allocator),
+            .materials = std.array_list.Managed(mat.Material).init(allocator),
+            .textures = std.array_list.Managed(mat.Texture).init(allocator),
         };
     }
 
