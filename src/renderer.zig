@@ -27,6 +27,7 @@ pub const Tracer = struct {
     pool: MemPool,
 
     pub fn init(
+        io: std.Io,
         allocator: std.mem.Allocator,
         img_w: usize,
         vfov: f64,
@@ -54,7 +55,7 @@ pub const Tracer = struct {
             .img = try image.Image.initEmpty(allocator, height, img_w),
             .rng = std.Random.DefaultPrng.init(blk: {
                 var seed: u64 = undefined;
-                try std.posix.getrandom(std.mem.asBytes(&seed));
+                io.random(std.mem.asBytes(&seed));
                 break :blk seed;
             }),
             .hittables = HittableList.init(allocator),

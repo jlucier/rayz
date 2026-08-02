@@ -9,41 +9,43 @@ const Tracer = renderer.Tracer;
 const V3 = vec.V3;
 const Sphere = geom.Sphere;
 
-pub fn main() !void {
-    var args = std.process.args();
+pub fn main(init: std.process.Init) !void {
+    var args = init.minimal.args.iterate();
     _ = args.skip();
 
     const img_w = try std.fmt.parseUnsigned(usize, args.next().?, 10);
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var tracer = try randomBouncing(init.io, init.arena.allocator(), img_w);
 
-    var tracer = try randomBouncing(allocator, img_w);
-
-    const st = try std.time.Instant.now();
+    const st = std.Io.Clock.Timestamp.now(init.io, .awake);
 
     const rays_traced: f64 = @floatFromInt(try tracer.render());
 
-    var durr: f64 = @floatFromInt(std.time.Instant.since(try std.time.Instant.now(), st));
+    var durr: f64 = @floatFromInt(st.untilNow(init.io).raw.toNanoseconds());
     durr /= std.time.ns_per_s;
+
     std.debug.print("Finished render ({d:.2}s): {d:.2} rps and {d:.2} us per ray\n", .{
         durr,
         rays_traced / durr,
         std.time.us_per_s * durr / rays_traced,
     });
 
-    if (args.next()) |out_fname| {
-        const f = try std.fs.cwd().createFile(out_fname, .{ .read = false, .truncate = true });
-        defer f.close();
-        try tracer.img.writePPM(f);
-    } else {
-        try tracer.img.writePPM(std.fs.File.stdout());
-    }
+    var buf: [1024]u8 = undefined;
+    var opt_f: ?std.Io.File = null;
+    defer if (opt_f) |f| f.close(init.io);
+
+    var w: std.Io.File.Writer = if (args.next()) |out_fname| blk: {
+        opt_f = try std.Io.Dir.cwd().createFile(init.io, out_fname, .{ .read = false, .truncate = true });
+        break :blk opt_f.?.writer(init.io, &buf);
+    } else std.Io.File.stdout().writerStreaming(init.io, &buf);
+
+    try tracer.img.writePPM(&w.interface);
+    try w.flush();
 }
 
-fn randomBouncing(allocator: std.mem.Allocator, img_w: usize) !Tracer {
+fn randomBouncing(io: std.Io, allocator: std.mem.Allocator, img_w: usize) !Tracer {
     var tracer = try Tracer.init(
+        io,
         allocator,
         img_w,
         20.0, // vfov
@@ -167,8 +169,9 @@ fn randomBouncing(allocator: std.mem.Allocator, img_w: usize) !Tracer {
     return tracer;
 }
 
-pub fn penultimateScene(allocator: std.mem.Allocator, img_w: usize) !Tracer {
+pub fn penultimateScene(io: std.Io, allocator: std.mem.Allocator, img_w: usize) !Tracer {
     var tracer = try Tracer.init(
+        io,
         allocator,
         img_w,
         20.0, // vfov
