@@ -108,6 +108,7 @@ pub const Tracer = struct {
         }
         std.debug.print("\rProgress: {d:.2}%", .{100.0});
         std.debug.print("\n", .{});
+        try self.bvh.print(0);
         return rays;
     }
 
@@ -115,7 +116,7 @@ pub const Tracer = struct {
         if (depth == 0)
             return V3{};
 
-        var hit: Hit = .{};
+        var hit = Hit{};
 
         if (self.bvh.findHit(&hit, &self.hittables, ray, 1e-10, std.math.inf(f64))) {
             // bounce light

@@ -67,6 +67,10 @@ pub const AABB = struct {
         return self.high.sub(self.low).add(self.high);
     }
 
+    pub fn volume(self: *const AABB) f64 {
+        return self.high.sub(self.low).mag();
+    }
+
     pub fn hit(self: *const AABB, ray: *const Ray, tmin: f64, tmax: f64) bool {
         // solve ray equation for t at the low and high ends of the boundaries per axis
         // p(t) = q + dt
@@ -168,11 +172,14 @@ pub const BVH = struct {
             prefix[i] = ' ';
         }
 
-        std.debug.print("{s}Node ({} - {d})\n", .{
+        std.debug.print("{s}{d} Node ({} - {d} - {d:.4})\n", .{
             prefix,
+            d,
             self.left != null,
             self.endi - self.starti,
+            self.bbox.volume(),
         });
+
         if (self.left != null) {
             try self.left.?.print(d + 1);
             try self.right.?.print(d + 1);
@@ -193,9 +200,9 @@ pub const BVH = struct {
 
         var maybe_hit = false;
 
-        if (self.left) |l| {
+        if (self.left != null) {
             // have children, check them
-            maybe_hit = l.findHit(hit, hittables, ray, tmin, tmax);
+            maybe_hit = self.left.?.findHit(hit, hittables, ray, tmin, tmax);
             maybe_hit |= self.right.?.findHit(
                 hit,
                 hittables,
