@@ -59,16 +59,25 @@ pub const AABB = struct {
         };
     }
 
+    pub fn diagonal(self: *const AABB) V3 {
+        return self.high.sub(self.low);
+    }
+
     pub fn longestAxis(self: *const AABB) u8 {
-        return self.high.sub(self.low).amax();
+        return self.diagonal().amax();
     }
 
     pub fn center(self: *const AABB) V3 {
-        return self.high.sub(self.low).add(self.high);
+        return self.diagonal().div(2).add(self.low);
     }
 
-    pub fn volume(self: *const AABB) f64 {
-        return self.high.sub(self.low).mag();
+    pub fn surfaceArea(self: *const AABB) f64 {
+        const d = self.diagonal();
+        return d.x * d.y + d.y * d.z + d.x * d.z;
+    }
+
+    pub fn diagonalLen(self: *const AABB) f64 {
+        return self.diagonal().mag();
     }
 
     pub fn hit(self: *const AABB, ray: *const Ray, tmin: f64, tmax: f64) bool {
@@ -108,6 +117,13 @@ pub const BVH = struct {
     endi: usize = 0,
     left: ?*BVH = null,
     right: ?*BVH = null,
+    hitChecks: usize = 0,
+
+    const SahSplit = struct {
+        ax: u8 = 0,
+        cost: f64 = 0,
+        thresh: f64 = 0,
+    };
 
     pub fn init(allocator: std.mem.Allocator) BVH {
         return .{ .allocator = allocator };
@@ -124,12 +140,55 @@ pub const BVH = struct {
         }
     }
 
-    const SortCtx = struct {
-        split_axis: u8,
-    };
+    /// Surface Area Heuristic implementation to split volumes on longest axis
+    fn sahFindSplit(self: *const BVH, hittables: []const Hittable) SahSplit {
+        const nAx: u8 = 3;
+        const nStep: usize = 12;
 
-    fn hittableLess(ctx: SortCtx, a: Hittable, b: Hittable) bool {
-        return a.bbox.low.at(ctx.split_axis) < b.bbox.low.at(ctx.split_axis);
+        var costs: [nAx * nStep]SahSplit = undefined;
+
+        for (&costs, 0..) |*c, i| {
+            c.ax = @intCast(i / nStep);
+            c.cost = std.math.inf(f64);
+
+            const i_f: f64 = @floatFromInt(i % nStep);
+            const step = self.bbox.diagonal().at(c.ax) / nStep;
+
+            c.thresh = self.bbox.low.at(c.ax) + step * (i_f + 1);
+
+            var a = AABB{};
+            var b = AABB{};
+            var countA: usize = 0;
+            var countB: usize = 0;
+
+            for (hittables) |h| {
+                if (h.bbox.center().at(c.ax) < c.thresh) {
+                    a = AABB.enclose(a, h.bbox);
+                    countA += 1;
+                } else {
+                    b = AABB.enclose(b, h.bbox);
+                    countB += 1;
+                }
+            }
+            if (countA > 0 and countB > 0) {
+                const ca: f64 = @floatFromInt(countA);
+                const cb: f64 = @floatFromInt(countB);
+                costs[i].cost = ca * a.surfaceArea() + cb * b.surfaceArea();
+            }
+        }
+
+        var minCost = &costs[0];
+        for (&costs) |*c| {
+            if (c.cost < minCost.cost) {
+                minCost = c;
+            }
+        }
+
+        return minCost.*;
+    }
+
+    fn hittableLess(ctx: SahSplit, a: Hittable, b: Hittable) bool {
+        return a.bbox.center().at(ctx.ax) < b.bbox.center().at(ctx.ax);
     }
 
     pub fn build(self: *BVH, hittables: *HittableList, si: usize, ei: usize) !void {
@@ -145,24 +204,34 @@ pub const BVH = struct {
             // I myself will own these and will not subdivide
             self.starti = si;
             self.endi = ei;
-        } else {
-            // subdivide
-            std.mem.sort(
-                Hittable,
-                hittables.items[si..ei],
-                SortCtx{ .split_axis = self.bbox.longestAxis() },
-                hittableLess,
-            );
-
-            self.left = try self.allocator.create(BVH);
-            self.right = try self.allocator.create(BVH);
-            self.left.?.* = BVH.init(self.allocator);
-            self.right.?.* = BVH.init(self.allocator);
-
-            const mid = nobjs / 2 + si;
-            try self.left.?.build(hittables, si, mid);
-            try self.right.?.build(hittables, mid, ei);
+            return;
         }
+
+        // subdivide
+        const split = self.sahFindSplit(hittables.items[si..ei]);
+        std.mem.sort(
+            Hittable,
+            hittables.items[si..ei],
+            split,
+            hittableLess,
+        );
+
+        // find the point where the centers cross thresh
+        var threshI = si + 1;
+        for (hittables.items[si + 1 .. ei], si + 1..) |h, i| {
+            if (h.bbox.center().at(split.ax) >= split.thresh) {
+                threshI = i;
+                break;
+            }
+        }
+
+        self.left = try self.allocator.create(BVH);
+        self.right = try self.allocator.create(BVH);
+        self.left.?.* = BVH.init(self.allocator);
+        self.right.?.* = BVH.init(self.allocator);
+
+        try self.left.?.build(hittables, si, threshI);
+        try self.right.?.build(hittables, threshI, ei);
     }
 
     pub fn print(self: *const BVH, d: usize) !void {
@@ -172,12 +241,13 @@ pub const BVH = struct {
             prefix[i] = ' ';
         }
 
-        std.debug.print("{s}{d} Node ({} - {d} - {d:.4})\n", .{
+        std.debug.print("{s}{d} Node ({} - {d} - {d:.4} - {d})\n", .{
             prefix,
             d,
             self.left != null,
             self.endi - self.starti,
-            self.bbox.volume(),
+            self.bbox.diagonalLen(),
+            self.hitChecks,
         });
 
         if (self.left != null) {
@@ -187,13 +257,14 @@ pub const BVH = struct {
     }
 
     pub fn findHit(
-        self: *const BVH,
+        self: *BVH,
         hit: *Hit,
         hittables: *const HittableList,
         ray: *const Ray,
         tmin: f64,
         tmax: f64,
     ) bool {
+        // self.hitChecks += 1;
         if (!self.bbox.hit(ray, tmin, tmax)) {
             return false;
         }

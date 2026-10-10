@@ -163,7 +163,7 @@ fn randomBouncing(allocator: std.mem.Allocator, img_w: usize, seed: u64) !Tracer
                     ),
                 } });
                 // moving from center up in y by [0,0.5] over the time window
-                sphere_ray.dir = V3.y_hat().mul(rand.float(f64) * 0.5);
+                sphere_ray.dir = V3.yHat().mul(rand.float(f64) * 0.5);
             } else if (rand_mat < 0.95) {
                 m = try tracer.pool.addAndReturnHandle(mat.Material{ .metallic = .{
                     .fuzz = rand.float(f64) * 0.5,
@@ -200,7 +200,7 @@ pub fn penultimateScene(io: std.Io, allocator: std.mem.Allocator, img_w: usize) 
         10.0, // defocus angle
         V3{ .x = -2, .y = 2, .z = 1 }, // look_from
         V3{ .x = 0, .y = 0, .z = -1 }, // look_at
-        V3.y_hat(), // vup
+        V3.yHat(), // vup
     );
 
     _ = try tracer.pool.add(Sphere.stationary(

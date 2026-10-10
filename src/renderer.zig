@@ -35,7 +35,7 @@ pub const Tracer = struct {
             0.6, // defocus angle
             V3{ .x = 13, .y = 2, .z = 3 }, // look_from
             V3{}, // look_at
-            V3.y_hat(), // vup
+            V3.yHat(), // vup
             seed,
         );
     }
@@ -108,7 +108,7 @@ pub const Tracer = struct {
         }
         std.debug.print("\rProgress: {d:.2}%", .{100.0});
         std.debug.print("\n", .{});
-        try self.bvh.print(0);
+        // try self.bvh.print(0);
         return rays;
     }
 
@@ -150,7 +150,7 @@ test "get ray" {
         0,
         look_from,
         look_at,
-        V3.y_hat(), // vup
+        V3.yHat(), // vup
         225,
         400,
     );

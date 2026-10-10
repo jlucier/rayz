@@ -32,15 +32,15 @@ pub const V3 = struct {
         };
     }
 
-    pub fn x_hat() V3 {
+    pub fn xHat() V3 {
         return V3{ .x = 1, .y = 0, .z = 0 };
     }
 
-    pub fn y_hat() V3 {
+    pub fn yHat() V3 {
         return V3{ .x = 0, .y = 1, .z = 0 };
     }
 
-    pub fn z_hat() V3 {
+    pub fn zHat() V3 {
         return V3{ .x = 0, .y = 0, .z = 1 };
     }
 
