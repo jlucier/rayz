@@ -115,7 +115,9 @@ pub const Tracer = struct {
         if (depth == 0)
             return V3{};
 
-        if (self.bvh.findHit(&self.hittables, ray, 1e-10, std.math.inf(f64))) |hit| {
+        var hit: Hit = .{};
+
+        if (self.bvh.findHit(&hit, &self.hittables, ray, 1e-10, std.math.inf(f64))) {
             // bounce light
             var ret = V3{};
             const m = hit.material.get(self.pool.materials.items);
@@ -138,10 +140,15 @@ pub const Tracer = struct {
 };
 
 test "get ray" {
+    const look_from = V3{ .x = -2, .y = 2, .z = 1 };
+    const look_at = V3{ .x = 0, .y = 0, .z = -1 };
+
     const cam = Camera.init(
         90,
-        V3{ .x = -2, .y = 2, .z = 1 }, // look_from
-        V3{ .x = 0, .y = 0, .z = -1 }, // look_at
+        look_from.sub(look_at).mag(),
+        0,
+        look_from,
+        look_at,
         V3.y_hat(), // vup
         225,
         400,

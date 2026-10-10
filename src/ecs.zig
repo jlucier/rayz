@@ -5,7 +5,7 @@ const hit = @import("./hit.zig");
 
 pub fn Handle(comptime T: type) type {
     return struct {
-        idx: usize,
+        idx: usize = 0,
 
         const Self = @This();
 

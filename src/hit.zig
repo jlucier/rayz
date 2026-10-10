@@ -14,13 +14,13 @@ pub const Hittable = struct {
 pub const HittableList = std.array_list.Managed(Hittable);
 
 pub const Hit = struct {
-    point: V3,
-    normal: V3,
-    t: f64,
+    point: V3 = .{},
+    normal: V3 = .{},
+    t: f64 = 0,
     u: f64 = 0,
     v: f64 = 0,
-    front_face: bool,
-    material: ecs.MaterialHandle,
+    front_face: bool = false,
+    material: ecs.MaterialHandle = .{},
 
     pub fn init(
         ray: *const Ray,
@@ -181,36 +181,38 @@ pub const BVH = struct {
 
     pub fn findHit(
         self: *const BVH,
+        hit: *Hit,
         hittables: *const HittableList,
         ray: *const Ray,
         tmin: f64,
         tmax: f64,
-    ) ?Hit {
+    ) bool {
         if (!self.bbox.hit(ray, tmin, tmax)) {
-            return null;
+            return false;
         }
 
-        // might hit something
-        var maybe_hit: ?Hit = null;
+        var maybe_hit = false;
 
-        if (self.left != null) {
+        if (self.left) |l| {
             // have children, check them
-            maybe_hit = self.left.?.findHit(hittables, ray, tmin, tmax);
-
-            const maxt = if (maybe_hit) |h| h.t else tmax;
-
-            if (self.right.?.findHit(hittables, ray, tmin, maxt)) |new_hit| {
-                maybe_hit = new_hit;
-            }
+            maybe_hit = l.findHit(hit, hittables, ray, tmin, tmax);
+            maybe_hit |= self.right.?.findHit(
+                hit,
+                hittables,
+                ray,
+                tmin,
+                if (maybe_hit) hit.t else tmax,
+            );
             return maybe_hit;
         }
 
         // no children, check hittables
         for (hittables.items[self.starti..self.endi]) |*h| {
-            const maxt = if (maybe_hit) |ht| ht.t else tmax;
+            const maxt = if (maybe_hit) hit.t else tmax;
 
             if (h.hit(h.ptr, ray, tmin, maxt)) |new_hit| {
-                maybe_hit = new_hit;
+                maybe_hit = true;
+                hit.* = new_hit;
             }
         }
         return maybe_hit;
@@ -306,7 +308,8 @@ test "bvh hit" {
         .dir = V3{ .x = 0.5, .y = 0.5, .z = 0.5 },
     };
 
-    try std.testing.expect(bvh.findHit(&hl, &r1, 0, 10) != null);
-    try std.testing.expect(bvh.findHit(&hl, &r2, 0, 10) == null);
-    try std.testing.expect(bvh.findHit(&hl, &r3, 0, 10) != null);
+    var hit: Hit = .{};
+    try std.testing.expect(bvh.findHit(&hit, &hl, &r1, 0, 10));
+    try std.testing.expect(!bvh.findHit(&hit, &hl, &r2, 0, 10));
+    try std.testing.expect(bvh.findHit(&hit, &hl, &r3, 0, 10));
 }
