@@ -86,11 +86,11 @@ pub const DiffuseMaterial = struct {
             target = args.hit.normal;
 
         return .{
-            .ray = .{
-                .origin = args.hit.point,
-                .dir = target.sub(args.hit.point),
-                .time = args.ray.time,
-            },
+            .ray = Ray.init(
+                args.hit.point,
+                target.sub(args.hit.point),
+                args.ray.time,
+            ),
             .attenuation = self.texture.get(args.textures).value(.{
                 .u = args.hit.u,
                 .v = args.hit.v,
@@ -116,11 +116,11 @@ pub const MetallicMaterial = struct {
         if (reflection_dir.dot(args.hit.normal) <= 0)
             return null;
         return .{
-            .ray = .{
-                .origin = args.hit.point,
-                .dir = reflection_dir,
-                .time = args.ray.time,
-            },
+            .ray = Ray.init(
+                args.hit.point,
+                reflection_dir,
+                args.ray.time,
+            ),
             .attenuation = self.texture.get(args.textures).value(.{
                 .u = args.hit.u,
                 .v = args.hit.v,
@@ -149,11 +149,11 @@ pub const DielectricMaterial = struct {
             dir = refract(unit_dir, args.hit.normal, eta);
         }
         return .{
-            .ray = .{
-                .origin = args.hit.point,
-                .dir = dir,
-                .time = args.ray.time,
-            },
+            .ray = Ray.init(
+                args.hit.point,
+                dir,
+                args.ray.time,
+            ),
             .attenuation = V3.ones(),
         };
     }

@@ -15,7 +15,7 @@ pub const Sphere = struct {
 
     pub fn stationary(center: V3, radius: f64, material: ecs.MaterialHandle) Sphere {
         return .{
-            .center = .{ .origin = center, .dir = .{} },
+            .center = Ray.init(center, .{}, 0),
             .radius = radius,
             .material = material,
         };
@@ -73,7 +73,7 @@ test "sphere bbox" {
     try std.testing.expect(s_bbox.high.close(V3.ones()));
 
     const move = Sphere{
-        .center = .{ .origin = .{}, .dir = V3.ones() },
+        .center = Ray.init(V3{}, V3.ones(), 0),
         .radius = 1,
         .material = .{ .idx = 0 },
     };

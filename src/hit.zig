@@ -84,8 +84,8 @@ pub const AABB = struct {
         // solve ray equation for t at the low and high ends of the boundaries per axis
         // p(t) = q + dt
         // x - q = dt
-        const t0s = self.low.sub(ray.origin).vdiv(ray.dir);
-        const t1s = self.high.sub(ray.origin).vdiv(ray.dir);
+        const t0s = self.low.sub(ray.origin).vmul(ray.invDir);
+        const t1s = self.high.sub(ray.origin).vmul(ray.invDir);
         var t0 = tmin;
         var t1 = tmax;
         const axes = [_]u8{ 0, 1, 2 };
@@ -327,18 +327,13 @@ test "enclose bbox" {
 
 test "bbox hit" {
     const box = AABB.init(V3.of(0), V3.ones());
-    const r1 = Ray{
-        .origin = V3.of(-1),
-        .dir = V3.ones(),
-    };
-    const r2 = Ray{
-        .origin = V3.of(-1),
-        .dir = V3.of(-1),
-    };
-    const r3 = Ray{
-        .origin = V3.of(-1),
-        .dir = V3{ .x = 0.5, .y = 0.5, .z = 0.5 },
-    };
+    const r1 = Ray.init(V3.of(-1), V3.ones(), 0);
+    const r2 = Ray.init(V3.of(-1), V3.of(-1), 0);
+    const r3 = Ray.init(
+        V3.of(-1),
+        V3{ .x = 0.5, .y = 0.5, .z = 0.5 },
+        0,
+    );
 
     try std.testing.expect(box.hit(&r1, 0, 10));
     try std.testing.expect(!box.hit(&r2, 0, 10));
@@ -350,11 +345,11 @@ test "bbox hit 2" {
         .{ .x = -1000, .y = -2000, .z = -1000 },
         .{ .x = 1000, .y = 2, .z = 1000 },
     );
-    const r1 = Ray{
-        .origin = vec.V3{ .x = 13, .y = 2, .z = 3 },
-        .dir = vec.V3{ .x = -9.6, .y = -1.5, .z = -2.3 },
-        .time = 0.6,
-    };
+    const r1 = Ray.init(
+        vec.V3{ .x = 13, .y = 2, .z = 3 },
+        vec.V3{ .x = -9.6, .y = -1.5, .z = -2.3 },
+        0.6,
+    );
 
     try std.testing.expect(box.hit(&r1, 0, 10));
 }
@@ -373,18 +368,13 @@ test "bvh hit" {
     });
     try bvh.build(&hl, 0, hl.items.len);
 
-    const r1 = Ray{
-        .origin = V3.of(-1),
-        .dir = V3.ones(),
-    };
-    const r2 = Ray{
-        .origin = V3.of(-1),
-        .dir = V3.of(-1),
-    };
-    const r3 = Ray{
-        .origin = V3.of(-1),
-        .dir = V3{ .x = 0.5, .y = 0.5, .z = 0.5 },
-    };
+    const r1 = Ray.init(V3.of(-1), V3.ones(), 0);
+    const r2 = Ray.init(V3.of(-1), V3.of(-1), 0);
+    const r3 = Ray.init(
+        V3.of(-1),
+        V3{ .x = 0.5, .y = 0.5, .z = 0.5 },
+        0,
+    );
 
     var hit: Hit = .{};
     try std.testing.expect(bvh.findHit(&hit, &hl, &r1, 0, 10));

@@ -146,10 +146,7 @@ fn randomBouncing(allocator: std.mem.Allocator, img_w: usize, seed: u64) !Tracer
             if (center.sub(V3{ .x = 4, .y = 0.2, .z = 0 }).mag() <= 0.9)
                 continue;
 
-            var sphere_ray = vec.Ray{
-                .origin = center,
-                .dir = V3{},
-            };
+            var sphere_ray = vec.Ray.init(center, .{}, 0);
             var m: ?ecs.MaterialHandle = null;
 
             if (rand_mat < 0.8) {

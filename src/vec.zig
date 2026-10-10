@@ -76,6 +76,10 @@ pub const V3 = struct {
         return self.div(self.mag());
     }
 
+    pub fn inverse(self: *const V3) V3 {
+        return V3.ones().vdiv(self.*);
+    }
+
     pub fn clamp(self: *const V3, low: f64, high: f64) V3 {
         return .{
             .x = utils.clamp(f64, self.x, low, high),
@@ -159,7 +163,17 @@ pub const V3 = struct {
 pub const Ray = struct {
     origin: V3,
     dir: V3,
+    invDir: V3,
     time: f64 = 0,
+
+    pub fn init(origin: V3, dir: V3, time: f64) Ray {
+        return .{
+            .origin = origin,
+            .dir = dir,
+            .invDir = dir.inverse(),
+            .time = time,
+        };
+    }
 
     pub fn at(self: *const Ray, t: f64) V3 {
         return self.origin.add(self.dir.mul(t));

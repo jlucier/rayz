@@ -67,13 +67,13 @@ pub const Camera = struct {
             origin = origin.add(self.randomInDefocus(r));
         }
 
-        return .{
-            .dir = self.px_du.mul(x).add(self.px_dv.mul(y)).add(
+        return Ray.init(
+            origin,
+            self.px_du.mul(x).add(self.px_dv.mul(y)).add(
                 self.px_origin,
-            ).sub(origin),
-            .origin = origin,
-            .time = if (rng) |r| r.float(f64) else 0,
-        };
+            ).sub(origin), // dir
+            if (rng) |r| r.float(f64) else 0,
+        );
     }
 
     fn randomInDefocus(self: *const Camera, rng: std.Random) V3 {
