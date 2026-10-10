@@ -26,8 +26,21 @@ pub const Tracer = struct {
     bvh: BVH,
     pool: MemPool,
 
+    pub fn default(allocator: std.mem.Allocator, img_w: usize, seed: u64) !Tracer {
+        return init(
+            allocator,
+            img_w,
+            20.0, // vfov
+            10.0, // focal dist
+            0.6, // defocus angle
+            V3{ .x = 13, .y = 2, .z = 3 }, // look_from
+            V3{}, // look_at
+            V3.y_hat(), // vup
+            seed,
+        );
+    }
+
     pub fn init(
-        io: std.Io,
         allocator: std.mem.Allocator,
         img_w: usize,
         vfov: f64,
@@ -36,6 +49,7 @@ pub const Tracer = struct {
         look_from: V3,
         look_at: V3,
         vup: V3,
+        seed: u64,
     ) !Tracer {
         const fimg_w: f64 = @floatFromInt(img_w);
         const height: usize = @intFromFloat(fimg_w / ASPECT_RATIO);
@@ -53,11 +67,7 @@ pub const Tracer = struct {
                 img_w,
             ),
             .img = try image.Image.initEmpty(allocator, height, img_w),
-            .rng = std.Random.DefaultPrng.init(blk: {
-                var seed: u64 = undefined;
-                io.random(std.mem.asBytes(&seed));
-                break :blk seed;
-            }),
+            .rng = std.Random.DefaultPrng.init(seed),
             .hittables = HittableList.init(allocator),
             .bvh = BVH.init(allocator),
             .pool = MemPool.init(allocator),

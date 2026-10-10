@@ -73,7 +73,6 @@ pub const AABB = struct {
         // x - q = dt
         const t0s = self.low.sub(ray.origin).vdiv(ray.dir);
         const t1s = self.high.sub(ray.origin).vdiv(ray.dir);
-
         var t0 = tmin;
         var t1 = tmax;
         const axes = [_]u8{ 0, 1, 2 };
@@ -111,11 +110,13 @@ pub const BVH = struct {
     }
 
     pub fn deinit(self: *const BVH) void {
-        for (self.children) |opt_c| {
-            if (opt_c) |c| {
-                c.deinit();
-                self.allocator.destroy(c);
-            }
+        if (self.left) |c| {
+            c.deinit();
+            self.allocator.destroy(c);
+        }
+        if (self.right) |c| {
+            c.deinit();
+            self.allocator.destroy(c);
         }
     }
 
@@ -278,52 +279,34 @@ test "bbox hit 2" {
     try std.testing.expect(box.hit(&r1, 0, 10));
 }
 
-// test "bvh memory management" {
-//     const alloc = std.testing.allocator;
-//
-//     var inner = try alloc.create(BVH);
-//     inner.allocator = alloc;
-//     inner.children = .{ null, null };
-//     inner.hittables = std.array_list.Managed(Hittable).init(alloc);
-//
-//     const h = DummyHittable{};
-//     try inner.hittables.append(.{
-//         .ptr = &h,
-//         .hit = DummyHittable.hit,
-//         .bbox = .{},
-//     });
-//
-//     var bvh = BVH.init(alloc);
-//     defer bvh.deinit();
-//
-//     bvh.left = inner;
-// }
+test "bvh hit" {
+    var bvh = BVH.init(std.testing.allocator);
+    defer bvh.deinit();
 
-// test "bvh hit" {
-//     var bvh = BVH.init(std.testing.allocator);
-//     defer bvh.deinit();
-//
-//     const d = DummyHittable{ .return_hit = true };
-//     try bvh.addHittable(.{
-//         .ptr = &d,
-//         .hit = DummyHittable.hit,
-//         .bbox = AABB.init(V3.of(0), V3.ones()),
-//     });
-//
-//     const r1 = Ray{
-//         .origin = V3.of(-1),
-//         .dir = V3.ones(),
-//     };
-//     const r2 = Ray{
-//         .origin = V3.of(-1),
-//         .dir = V3.of(-1),
-//     };
-//     const r3 = Ray{
-//         .origin = V3.of(-1),
-//         .dir = V3{ .x = 0.5, .y = 0.5, .z = 0.5 },
-//     };
-//
-//     try std.testing.expect(bvh.findHit(&r1, 0, 10) != null);
-//     try std.testing.expect(bvh.findHit(&r2, 0, 10) == null);
-//     try std.testing.expect(bvh.findHit(&r3, 0, 10) != null);
-// }
+    const dh = DummyHittable{ .return_hit = true };
+    var hl = HittableList.init(std.testing.allocator);
+    defer hl.deinit();
+    try hl.append(.{
+        .ptr = &dh,
+        .hit = DummyHittable.hit,
+        .bbox = AABB.init(V3.of(0), V3.ones()),
+    });
+    try bvh.build(&hl, 0, hl.items.len);
+
+    const r1 = Ray{
+        .origin = V3.of(-1),
+        .dir = V3.ones(),
+    };
+    const r2 = Ray{
+        .origin = V3.of(-1),
+        .dir = V3.of(-1),
+    };
+    const r3 = Ray{
+        .origin = V3.of(-1),
+        .dir = V3{ .x = 0.5, .y = 0.5, .z = 0.5 },
+    };
+
+    try std.testing.expect(bvh.findHit(&hl, &r1, 0, 10) != null);
+    try std.testing.expect(bvh.findHit(&hl, &r2, 0, 10) == null);
+    try std.testing.expect(bvh.findHit(&hl, &r3, 0, 10) != null);
+}
