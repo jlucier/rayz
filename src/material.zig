@@ -71,7 +71,7 @@ pub const DiffuseScatterMethod = enum {
 };
 
 pub const DiffuseMaterial = struct {
-    method: DiffuseScatterMethod = .HEMISPHERE,
+    method: DiffuseScatterMethod = .UNIT_SPHERE_SURFACE,
     texture: ecs.TextureHandle,
 
     pub fn scatter(self: *const DiffuseMaterial, args: ScatterParam) ?ScatterResult {

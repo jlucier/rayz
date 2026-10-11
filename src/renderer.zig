@@ -181,7 +181,7 @@ pub const Tracer = struct {
 
         // miss, background gradient
         const t: f64 = 0.5 * (ray.dir.unit().y + 1.0);
-        return V3.ones().mul(1.0 - t).add(V3{ .x = 0.5, .y = 0.7, .z = 1.0 }).mul(t);
+        return V3.ones().mul(1.0 - t).add((V3{ .x = 0.5, .y = 0.7, .z = 1.0 }).mul(t));
     }
 };
 
