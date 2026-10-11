@@ -13,26 +13,44 @@ const Params = struct {
     imgW: usize = 0,
     seed: u64 = 0,
     samples: usize = 10,
+    scene: u8 = 0,
     outFile: ?[]const u8 = null,
 };
 
 fn processArgs(io: std.Io, args: []const []const u8) !Params {
     var params = Params{};
 
-    const seedPrefix = "--seed=";
-    const sampPrefix = "--samples=";
-    for (args[1..]) |a| {
-        if (a.len >= seedPrefix.len and std.mem.eql(u8, seedPrefix, a[0..seedPrefix.len])) {
-            params.seed = try std.fmt.parseUnsigned(u64, a[seedPrefix.len..], 10);
-        } else if (a.len >= sampPrefix.len and std.mem.eql(u8, sampPrefix, a[0..sampPrefix.len])) {
-            params.samples = try std.fmt.parseUnsigned(usize, a[sampPrefix.len..], 10);
-        } else {
-            // positional = imgW or file
-            if (std.fmt.parseUnsigned(usize, a, 10)) |v| {
-                params.imgW = v;
-            } else |_| {
-                params.outFile = a;
+    const namedArgs: [3][]const u8 = .{
+        "--seed=",
+        "--samples=",
+        "--scene=",
+    };
+
+    outer: for (args[1..]) |a| {
+        for (namedArgs, 0..) |prefix, i| {
+            if (a.len >= prefix.len and std.mem.eql(u8, prefix, a[0..prefix.len])) {
+                const part = a[prefix.len..];
+                switch (i) {
+                    0 => {
+                        params.seed = try std.fmt.parseUnsigned(u64, part, 10);
+                    },
+                    1 => {
+                        params.samples = try std.fmt.parseUnsigned(usize, part, 10);
+                    },
+                    2 => {
+                        params.scene = try std.fmt.parseUnsigned(u8, part, 10);
+                    },
+                    else => unreachable,
+                }
+                continue :outer;
             }
+        }
+
+        // positional = imgW or file
+        if (std.fmt.parseUnsigned(usize, a, 10)) |v| {
+            params.imgW = v;
+        } else |_| {
+            params.outFile = a;
         }
     }
 
@@ -50,7 +68,11 @@ pub fn main(init: std.process.Init) !void {
 
     const params = try processArgs(init.io, args);
 
-    var tracer = try randomBouncing(init.io, arena, &params);
+    var tracer = switch (params.scene) {
+        0 => try randomBouncing(init.io, arena, &params),
+        1 => try penultimateScene(init.io, arena, &params),
+        else => unreachable,
+    };
 
     const st = std.Io.Clock.Timestamp.now(init.io, .awake);
 
@@ -192,74 +214,72 @@ fn randomBouncing(io: std.Io, allocator: std.mem.Allocator, params: *const Param
     return tracer;
 }
 
-pub fn penultimateScene(io: std.Io, allocator: std.mem.Allocator, imgW: usize) !Tracer {
+pub fn penultimateScene(
+    io: std.Io,
+    allocator: std.mem.Allocator,
+    params: *const Params,
+) !Tracer {
     var tracer = try Tracer.init(
         io,
         allocator,
-        imgW,
+        params.imgW,
         20.0, // vfov
         3.4, // focal dist
         10.0, // defocus angle
         V3{ .x = -2, .y = 2, .z = 1 }, // look_from
         V3{ .x = 0, .y = 0, .z = -1 }, // look_at
         V3.yHat(), // vup
+        params.seed,
+        params.samples,
     );
 
     _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = 0, .y = 0, .z = -1.2 },
         0.5,
-        try tracer.pool.addMaterialWithTexture(
-            .{ .mat_type = .Diffuse },
-            try mat.Texture.init(
-                allocator,
-                mat.SolidTexture{ .color = .{ .x = 0.1, .y = 0.2, .z = 0.5 } },
-            ),
-        ),
+        try tracer.pool.addAndReturnHandle(mat.Material{ .diffuse = .{
+            .texture = try tracer.pool.addAndReturnHandle(mat.Texture{
+                .solid = .{ .color = .{ .x = 0.1, .y = 0.2, .z = 0.5 } },
+            }),
+        } }),
     ));
     _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = 0, .y = -100.5, .z = -1 },
         100,
-        try tracer.pool.addMaterialWithTexture(
-            .{ .mat_type = .Diffuse },
-            try mat.Texture.init(
-                allocator,
-                mat.SolidTexture{ .color = .{ .x = 0.8, .y = 0.8, .z = 0.0 } },
-            ),
-        ),
+        try tracer.pool.addAndReturnHandle(mat.Material{ .diffuse = .{
+            .texture = try tracer.pool.addAndReturnHandle(mat.Texture{
+                .solid = .{ .color = .{ .x = 0.8, .y = 0.8, .z = 0.0 } },
+            }),
+        } }),
     ));
 
     // left outer
     _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = -1, .y = 0, .z = -1 },
         0.5,
-        try tracer.pool.add(mat.Material{
-            .mat_type = .Dielectric,
+        try tracer.pool.addAndReturnHandle(mat.Material{ .dielectric = .{
             .refractive_index = 1.5,
-        }),
+        } }),
     ));
 
     // left inner bubble
     _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = -1, .y = 0, .z = -1 },
         0.4,
-        try tracer.pool.add(mat.Material{
-            .mat_type = .Dielectric,
+        try tracer.pool.addAndReturnHandle(mat.Material{ .dielectric = .{
             .refractive_index = 1.0 / 1.5,
-        }),
+        } }),
     ));
 
     _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = 1, .y = 0, .z = -1 },
         0.5,
-        try tracer.pool.addMaterialWithTexture(
-            .{ .mat_type = .Metallic, .fuzz = 1.0 },
-            try mat.Texture.init(
-                allocator,
-                mat.SolidTexture{
+        try tracer.pool.addAndReturnHandle(mat.Material{ .diffuse = .{
+            .texture = try tracer.pool.addAndReturnHandle(mat.Texture{
+                .solid = .{
                     .color = .{ .x = 0.8, .y = 0.6, .z = 0.2 },
                 },
-            ),
-        ),
+            }),
+        } }),
     ));
     return tracer;
 }
