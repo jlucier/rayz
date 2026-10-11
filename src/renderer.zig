@@ -16,18 +16,26 @@ const BVH = hitmod.BVH;
 const ASPECT_RATIO = 16.0 / 9.0;
 
 pub const Tracer = struct {
+    io: std.Io,
     allocator: std.mem.Allocator,
     camera: Camera,
     img: image.Image,
-    rng: std.Random.DefaultPrng,
-    max_bounces: usize = 50,
-    samples_per_px: usize = 10,
+    maxBounces: usize = 50,
+    samplesPerPx: usize = 10,
     hittables: HittableList,
     bvh: BVH,
     pool: MemPool,
+    seed: u64,
 
-    pub fn default(allocator: std.mem.Allocator, img_w: usize, seed: u64) !Tracer {
+    pub fn default(
+        io: std.Io,
+        allocator: std.mem.Allocator,
+        img_w: usize,
+        seed: u64,
+        samplesPerPx: usize,
+    ) !Tracer {
         return init(
+            io,
             allocator,
             img_w,
             20.0, // vfov
@@ -37,10 +45,12 @@ pub const Tracer = struct {
             V3{}, // look_at
             V3.yHat(), // vup
             seed,
+            samplesPerPx,
         );
     }
 
     pub fn init(
+        io: std.Io,
         allocator: std.mem.Allocator,
         img_w: usize,
         vfov: f64,
@@ -50,11 +60,13 @@ pub const Tracer = struct {
         look_at: V3,
         vup: V3,
         seed: u64,
+        samplesPerPx: usize,
     ) !Tracer {
         const fimg_w: f64 = @floatFromInt(img_w);
         const height: usize = @intFromFloat(fimg_w / ASPECT_RATIO);
 
         return .{
+            .io = io,
             .allocator = allocator,
             .camera = Camera.init(
                 vfov,
@@ -67,10 +79,11 @@ pub const Tracer = struct {
                 img_w,
             ),
             .img = try image.Image.initEmpty(allocator, height, img_w),
-            .rng = std.Random.DefaultPrng.init(seed),
             .hittables = HittableList.init(allocator),
             .bvh = BVH.init(allocator),
             .pool = MemPool.init(allocator),
+            .seed = seed,
+            .samplesPerPx = samplesPerPx,
         };
     }
 
@@ -80,39 +93,92 @@ pub const Tracer = struct {
         self.hittables.deinit();
     }
 
-    pub fn render(self: *Tracer) !usize {
-        var rays: usize = 0;
-        var j: usize = 0;
+    const Worker = struct {
+        thread: std.Thread,
+        start: usize,
+        end: usize,
+        rays: usize = 0,
+        donePixels: usize = 0,
+    };
 
+    pub fn render(self: *Tracer) !usize {
         self.hittables.clearRetainingCapacity();
         try self.pool.initHittables(&self.hittables);
         try self.bvh.build(&self.hittables, 0, self.hittables.items.len);
 
-        while (j < self.img.h) : (j += 1) {
-            var i: usize = 0;
-            const fj: f64 = @floatFromInt(j);
-            const fh: f64 = @floatFromInt(self.img.h);
-            std.debug.print("\rProgress: {d:.2}%", .{fj / fh * 100});
-            while (i < self.img.w) : (i += 1) {
-                var r: usize = 0;
-                var acc_color = V3{};
-                while (r < self.samples_per_px) : (r += 1) {
-                    const ray = self.camera.getRay(i, j, self.rng.random());
-                    rays += 1;
-                    acc_color = acc_color.add(self.bounceRay(&ray, self.max_bounces));
-                }
+        const minRowsPerThread: f64 = 10;
+        const imgh: f64 = @floatFromInt(self.img.h);
+        const nRowChunks: usize = @intFromFloat(@ceil(imgh / minRowsPerThread));
+        const nWorkers = @min(nRowChunks, try std.Thread.getCpuCount());
+        const nwf: f64 = @floatFromInt(nWorkers);
+        const rowsPerThread: usize = @intFromFloat(@ceil(imgh / nwf));
 
-                self.img.pixels[j * self.img.w + i] = //
-                    acc_color.div(@floatFromInt(self.samples_per_px));
-            }
+        const workers: []Worker = try self.allocator.alloc(Worker, nWorkers);
+        defer self.allocator.free(workers);
+
+        for (workers, 0..) |*w, i| {
+            w.donePixels = 0;
+            w.rays = 0;
+            w.start = i * rowsPerThread;
+            w.end = @min(self.img.h, (i + 1) * rowsPerThread);
+            w.thread = try std.Thread.spawn(.{}, Tracer.threadRender, .{ self, w });
         }
-        std.debug.print("\rProgress: {d:.2}%", .{100.0});
-        std.debug.print("\n", .{});
-        // try self.bvh.print(0);
+
+        const tot = self.img.w * self.img.h;
+        while (true) {
+            var done: usize = 0;
+            for (workers) |*w| {
+                done += w.donePixels;
+            }
+            const ft: f32 = @floatFromInt(tot);
+            const fd: f32 = @floatFromInt(done);
+            std.debug.print("\rProgress: {d:.2}%", .{fd / ft * 100});
+
+            if (done == tot) {
+                std.debug.print("\n", .{});
+                break;
+            }
+            try self.io.sleep(.fromMilliseconds(50), .awake);
+        }
+
+        var rays: usize = 0;
+        for (workers) |w| {
+            w.thread.join();
+            rays += w.rays;
+        }
+
         return rays;
     }
 
-    fn bounceRay(self: *Tracer, ray: *const Ray, depth: usize) V3 {
+    fn threadRender(self: *Tracer, w: *Worker) void {
+        const ss: u64 = @intCast(w.start);
+        const es: u64 = @intCast(w.end);
+        var rng = std.Random.DefaultPrng.init(self.seed + es - ss);
+
+        for (w.start..w.end) |j| {
+            for (0..self.img.w) |i| {
+                var r: usize = 0;
+                var acc_color = V3{};
+                while (r < self.samplesPerPx) : (r += 1) {
+                    const ray = self.camera.getRay(i, j, rng.random());
+                    w.rays += 1;
+                    acc_color = acc_color.add(self.bounceRay(&ray, &rng, self.maxBounces));
+                }
+
+                self.img.pixels[j * self.img.w + i] = //
+                    acc_color.div(@floatFromInt(self.samplesPerPx));
+
+                w.donePixels += 1;
+            }
+        }
+    }
+
+    fn bounceRay(
+        self: *const Tracer,
+        ray: *const Ray,
+        rng: *std.Random.DefaultPrng,
+        depth: usize,
+    ) V3 {
         if (depth == 0)
             return V3{};
 
@@ -123,13 +189,13 @@ pub const Tracer = struct {
             var ret = V3{};
             const m = hit.material.get(self.pool.materials.items);
             const param = mat.ScatterParam{
-                .random = self.rng.random(),
+                .random = rng.random(),
                 .ray = ray,
                 .hit = &hit,
                 .textures = self.pool.textures.items,
             };
             if (m.scatter(param)) |res| {
-                ret = self.bounceRay(&res.ray, depth - 1).vmul(res.attenuation);
+                ret = self.bounceRay(&res.ray, rng, depth - 1).vmul(res.attenuation);
             }
             return ret;
         }

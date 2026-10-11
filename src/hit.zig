@@ -257,7 +257,7 @@ pub const BVH = struct {
     }
 
     pub fn findHit(
-        self: *BVH,
+        self: *const BVH,
         hit: *Hit,
         hittables: *const HittableList,
         ray: *const Ray,

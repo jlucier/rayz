@@ -10,24 +10,28 @@ const V3 = vec.V3;
 const Sphere = geom.Sphere;
 
 const Params = struct {
-    img_w: usize = 0,
+    imgW: usize = 0,
     seed: u64 = 0,
-    out_file: ?[]const u8 = null,
+    samples: usize = 10,
+    outFile: ?[]const u8 = null,
 };
 
 fn processArgs(io: std.Io, args: []const []const u8) !Params {
     var params = Params{};
 
     const seedPrefix = "--seed=";
+    const sampPrefix = "--samples=";
     for (args[1..]) |a| {
         if (a.len >= seedPrefix.len and std.mem.eql(u8, seedPrefix, a[0..seedPrefix.len])) {
             params.seed = try std.fmt.parseUnsigned(u64, a[seedPrefix.len..], 10);
+        } else if (a.len >= sampPrefix.len and std.mem.eql(u8, sampPrefix, a[0..sampPrefix.len])) {
+            params.samples = try std.fmt.parseUnsigned(usize, a[sampPrefix.len..], 10);
         } else {
-            // positional = img_w or file
+            // positional = imgW or file
             if (std.fmt.parseUnsigned(usize, a, 10)) |v| {
-                params.img_w = v;
+                params.imgW = v;
             } else |_| {
-                params.out_file = a;
+                params.outFile = a;
             }
         }
     }
@@ -46,7 +50,7 @@ pub fn main(init: std.process.Init) !void {
 
     const params = try processArgs(init.io, args);
 
-    var tracer = try randomBouncing(arena, params.img_w, params.seed);
+    var tracer = try randomBouncing(init.io, arena, &params);
 
     const st = std.Io.Clock.Timestamp.now(init.io, .awake);
 
@@ -65,7 +69,7 @@ pub fn main(init: std.process.Init) !void {
     var opt_f: ?std.Io.File = null;
     defer if (opt_f) |f| f.close(init.io);
 
-    var w: std.Io.File.Writer = if (params.out_file) |out_fname| blk: {
+    var w: std.Io.File.Writer = if (params.outFile) |out_fname| blk: {
         opt_f = try std.Io.Dir.cwd().createFile(init.io, out_fname, .{ .read = false, .truncate = true });
         break :blk opt_f.?.writer(init.io, &buf);
     } else std.Io.File.stdout().writerStreaming(init.io, &buf);
@@ -74,8 +78,8 @@ pub fn main(init: std.process.Init) !void {
     try w.flush();
 }
 
-fn randomBouncing(allocator: std.mem.Allocator, img_w: usize, seed: u64) !Tracer {
-    var tracer = try Tracer.default(allocator, img_w, seed);
+fn randomBouncing(io: std.Io, allocator: std.mem.Allocator, params: *const Params) !Tracer {
+    var tracer = try Tracer.default(io, allocator, params.imgW, params.seed, params.samples);
     // ground
     _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = 0, .y = -1000, .z = 0 },
@@ -129,7 +133,8 @@ fn randomBouncing(allocator: std.mem.Allocator, img_w: usize, seed: u64) !Tracer
     // randoms
 
     var a: isize = -11;
-    const rand = tracer.rng.random();
+    var rng = std.Random.DefaultPrng.init(tracer.seed);
+    const rand = rng.random();
     while (a < 11) : (a += 1) {
         var b: isize = -11;
         while (b < 11) : (b += 1) {
@@ -187,11 +192,11 @@ fn randomBouncing(allocator: std.mem.Allocator, img_w: usize, seed: u64) !Tracer
     return tracer;
 }
 
-pub fn penultimateScene(io: std.Io, allocator: std.mem.Allocator, img_w: usize) !Tracer {
+pub fn penultimateScene(io: std.Io, allocator: std.mem.Allocator, imgW: usize) !Tracer {
     var tracer = try Tracer.init(
         io,
         allocator,
-        img_w,
+        imgW,
         20.0, // vfov
         3.4, // focal dist
         10.0, // defocus angle
