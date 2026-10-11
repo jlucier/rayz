@@ -71,6 +71,7 @@ pub fn main(init: std.process.Init) !void {
     var tracer = switch (params.scene) {
         0 => try randomBouncing(init.io, arena, &params),
         1 => try penultimateScene(init.io, arena, &params),
+        2 => try checkeredSpheres(init.io, arena, &params),
         else => unreachable,
     };
 
@@ -100,8 +101,38 @@ pub fn main(init: std.process.Init) !void {
     try w.flush();
 }
 
+fn checkeredSpheres(io: std.Io, allocator: std.mem.Allocator, params: *const Params) !Tracer {
+    var tracer = try Tracer.init(io, allocator, .{
+        .imgW = params.imgW,
+        .seed = params.seed,
+        .samplesPerPx = params.samples,
+        .defocusAngle = 0.0,
+    });
+
+    const checker = try tracer.pool.addAndReturnHandle(mat.Material{ .diffuse = .{
+        .texture = try tracer.pool.addAndReturnHandle(mat.Texture{ .checker = .{
+            .scale = 0.32,
+            .even = try tracer.pool.addAndReturnHandle(
+                mat.Texture{
+                    .solid = .{ .color = .{ .x = 0.2, .y = 0.3, .z = 0.1 } },
+                },
+            ),
+            .odd = try tracer.pool.addAndReturnHandle(
+                mat.Texture{ .solid = .{ .color = V3.of(0.9) } },
+            ),
+        } }),
+    } });
+    _ = try tracer.pool.add(Sphere.stationary(.{ .x = 0, .y = -10, .z = 0 }, 10, checker));
+    _ = try tracer.pool.add(Sphere.stationary(.{ .x = 0, .y = 10, .z = 0 }, 10, checker));
+    return tracer;
+}
+
 fn randomBouncing(io: std.Io, allocator: std.mem.Allocator, params: *const Params) !Tracer {
-    var tracer = try Tracer.default(io, allocator, params.imgW, params.seed, params.samples);
+    var tracer = try Tracer.init(io, allocator, .{
+        .imgW = params.imgW,
+        .seed = params.seed,
+        .samplesPerPx = params.samples,
+    });
     // ground
     _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = 0, .y = -1000, .z = 0 },
@@ -214,24 +245,16 @@ fn randomBouncing(io: std.Io, allocator: std.mem.Allocator, params: *const Param
     return tracer;
 }
 
-pub fn penultimateScene(
-    io: std.Io,
-    allocator: std.mem.Allocator,
-    params: *const Params,
-) !Tracer {
-    var tracer = try Tracer.init(
-        io,
-        allocator,
-        params.imgW,
-        20.0, // vfov
-        3.4, // focal dist
-        10.0, // defocus angle
-        V3{ .x = -2, .y = 2, .z = 1 }, // look_from
-        V3{ .x = 0, .y = 0, .z = -1 }, // look_at
-        V3.yHat(), // vup
-        params.seed,
-        params.samples,
-    );
+fn penultimateScene(io: std.Io, allocator: std.mem.Allocator, params: *const Params) !Tracer {
+    var tracer = try Tracer.init(io, allocator, .{
+        .imgW = params.imgW,
+        .focusDist = 3.4,
+        .defocusAngle = 10,
+        .lookFrom = .{ .x = -2, .y = 2, .z = 1 },
+        .lookAt = .{ .x = 0, .y = 0, .z = -1 },
+        .seed = params.seed,
+        .samplesPerPx = params.samples,
+    });
 
     _ = try tracer.pool.add(Sphere.stationary(
         .{ .x = 0, .y = 0, .z = -1.2 },

@@ -27,63 +27,42 @@ pub const Tracer = struct {
     pool: MemPool,
     seed: u64,
 
-    pub fn default(
-        io: std.Io,
-        allocator: std.mem.Allocator,
-        img_w: usize,
+    pub const Options = struct {
+        imgW: usize,
         seed: u64,
-        samplesPerPx: usize,
-    ) !Tracer {
-        return init(
-            io,
-            allocator,
-            img_w,
-            20.0, // vfov
-            10.0, // focal dist
-            0.6, // defocus angle
-            V3{ .x = 13, .y = 2, .z = 3 }, // look_from
-            V3{}, // look_at
-            V3.yHat(), // vup
-            seed,
-            samplesPerPx,
-        );
-    }
+        maxBounces: usize = 50,
+        samplesPerPx: usize = 10,
+        vfov: f64 = 20,
+        focusDist: f64 = 10,
+        defocusAngle: f64 = 0.6,
+        lookFrom: V3 = .{ .x = 13, .y = 2, .z = 3 },
+        lookAt: V3 = .{},
+        vup: V3 = V3.yHat(),
+    };
 
-    pub fn init(
-        io: std.Io,
-        allocator: std.mem.Allocator,
-        img_w: usize,
-        vfov: f64,
-        focus_dist: f64,
-        defocus_angle: f64,
-        look_from: V3,
-        look_at: V3,
-        vup: V3,
-        seed: u64,
-        samplesPerPx: usize,
-    ) !Tracer {
-        const fimg_w: f64 = @floatFromInt(img_w);
-        const height: usize = @intFromFloat(fimg_w / ASPECT_RATIO);
+    pub fn init(io: std.Io, allocator: std.mem.Allocator, opts: Options) !Tracer {
+        const fimgW: f64 = @floatFromInt(opts.imgW);
+        const height: usize = @intFromFloat(fimgW / ASPECT_RATIO);
 
         return .{
             .io = io,
             .allocator = allocator,
             .camera = Camera.init(
-                vfov,
-                focus_dist,
-                defocus_angle,
-                look_from,
-                look_at,
-                vup,
+                opts.vfov,
+                opts.focusDist,
+                opts.defocusAngle,
+                opts.lookFrom,
+                opts.lookAt,
+                opts.vup,
                 height,
-                img_w,
+                opts.imgW,
             ),
-            .img = try image.Image.initEmpty(allocator, height, img_w),
+            .img = try image.Image.initEmpty(allocator, height, opts.imgW),
             .hittables = HittableList.init(allocator),
             .bvh = BVH.init(allocator),
             .pool = MemPool.init(allocator),
-            .seed = seed,
-            .samplesPerPx = samplesPerPx,
+            .seed = opts.seed,
+            .samplesPerPx = opts.samplesPerPx,
         };
     }
 
