@@ -15,15 +15,17 @@ const Params = struct {
     samples: usize = 10,
     scene: u8 = 0,
     out_file: ?[]const u8 = null,
+    parallel: bool = true,
 };
 
 fn processArgs(io: std.Io, args: []const []const u8) !Params {
     var params = Params{};
 
-    const named_args: [3][]const u8 = .{
+    const named_args: [4][]const u8 = .{
         "--seed=",
         "--samples=",
         "--scene=",
+        "--noparallel",
     };
 
     outer: for (args[1..]) |a| {
@@ -39,6 +41,9 @@ fn processArgs(io: std.Io, args: []const []const u8) !Params {
                     },
                     2 => {
                         params.scene = try std.fmt.parseUnsigned(u8, part, 10);
+                    },
+                    3 => {
+                        params.parallel = false;
                     },
                     else => unreachable,
                 }
@@ -78,7 +83,7 @@ pub fn main(init: std.process.Init) !void {
 
     const st = std.Io.Clock.Timestamp.now(init.io, .awake);
 
-    const rays_traced: f64 = @floatFromInt(try tracer.render());
+    const rays_traced: f64 = @floatFromInt(try tracer.render(params.parallel));
 
     var durr: f64 = @floatFromInt(st.untilNow(init.io).raw.toNanoseconds());
     durr /= std.time.ns_per_s;

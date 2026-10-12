@@ -80,7 +80,7 @@ pub const Tracer = struct {
         done_pixels: usize = 0,
     };
 
-    pub fn render(self: *Tracer) !usize {
+    pub fn render(self: *Tracer, parallel: bool) !usize {
         self.hittables.clearRetainingCapacity();
         try self.pool.initHittables(&self.hittables);
         try self.bvh.build(&self.hittables, 0, self.hittables.items.len);
@@ -90,7 +90,10 @@ pub const Tracer = struct {
         const row_chunk_count: usize = @intFromFloat(
             @ceil(image_height_f / min_rows_per_thread),
         );
-        const worker_count = @min(row_chunk_count, try std.Thread.getCpuCount());
+        const worker_count = if (parallel) @min(
+            row_chunk_count,
+            try std.Thread.getCpuCount(),
+        ) else 1;
         const worker_count_f: f64 = @floatFromInt(worker_count);
         const rows_per_thread: usize = @intFromFloat(@ceil(image_height_f / worker_count_f));
 
