@@ -8,7 +8,13 @@ const V3 = vec.V3;
 pub const Hittable = struct {
     bbox: AABB,
     ptr: *const anyopaque,
-    hit: *const fn (ptr: *const anyopaque, ray: *const Ray, tmin: f64, tmax: f64) ?Hit,
+    hit: *const fn (
+        ptr: *const anyopaque,
+        ray: *const Ray,
+        hitOut: *Hit,
+        tmin: f64,
+        tmax: f64,
+    ) bool,
 };
 
 pub const HittableList = std.array_list.Managed(Hittable);
@@ -19,8 +25,8 @@ pub const Hit = struct {
     t: f64 = 0,
     u: f64 = 0,
     v: f64 = 0,
-    front_face: bool = false,
     material: ecs.MaterialHandle = .{},
+    frontFace: bool = false,
 
     pub fn init(
         ray: *const Ray,
@@ -35,8 +41,8 @@ pub const Hit = struct {
             .point = point,
             .normal = if (front_face) normal else normal.mul(-1),
             .t = t,
-            .front_face = front_face,
             .material = material,
+            .frontFace = front_face,
         };
     }
 };
@@ -288,9 +294,8 @@ pub const BVH = struct {
         for (hittables.items[self.starti..self.endi]) |*h| {
             const maxt = if (maybe_hit) hit.t else tmax;
 
-            if (h.hit(h.ptr, ray, tmin, maxt)) |new_hit| {
+            if (h.hit(h.ptr, ray, hit, tmin, maxt)) {
                 maybe_hit = true;
-                hit.* = new_hit;
             }
         }
         return maybe_hit;
@@ -300,18 +305,19 @@ pub const BVH = struct {
 const DummyHittable = struct {
     return_hit: bool = false,
 
-    pub fn hit(ptr: *const anyopaque, _: *const Ray, _: f64, _: f64) ?Hit {
+    pub fn hit(ptr: *const anyopaque, _: *const Ray, ho: *Hit, _: f64, _: f64) bool {
         const self: *const DummyHittable = @ptrCast(@alignCast(ptr));
         if (self.return_hit) {
-            return .{
+            ho.* = Hit{
                 .point = V3{},
                 .normal = V3{},
                 .t = 0,
-                .front_face = true,
+                .frontFace = true,
                 .material = .{ .idx = 0 },
             };
+            return true;
         }
-        return null;
+        return false;
     }
 };
 

@@ -30,12 +30,15 @@ pub const Sphere = struct {
         return AABB.enclose(b1, b2);
     }
 
-    pub fn hit(ptr: *const anyopaque, ray: *const Ray, tmin: f64, tmax: f64) ?Hit {
+    pub fn hit(
+        ptr: *const anyopaque,
+        ray: *const Ray,
+        hitOut: *Hit,
+        tmin: f64,
+        tmax: f64,
+    ) bool {
         const self: *const Sphere = @ptrCast(@alignCast(ptr));
-        return self.hitInner(ray, tmin, tmax);
-    }
 
-    fn hitInner(self: *const Sphere, ray: *const Ray, tmin: f64, tmax: f64) ?Hit {
         // check quadratic formula discriminant for roots, if real roots then hit
         const origin_now = self.center.at(ray.time);
         const offset = origin_now.sub(ray.origin);
@@ -47,7 +50,7 @@ pub const Sphere = struct {
         const discriminant = half_b * half_b - a * c;
 
         if (discriminant < 0)
-            return null;
+            return false;
 
         const rt = @sqrt(discriminant);
         const t1 = (half_b - rt) / a;
@@ -58,11 +61,12 @@ pub const Sphere = struct {
             else null;
 
         if (t == null)
-            return null;
+            return false;
 
         const point = ray.at(t.?);
         const n = point.sub(origin_now).unit();
-        return Hit.init(ray, point, n, t.?, self.material);
+        hitOut.* = Hit.init(ray, point, n, t.?, self.material);
+        return true;
     }
 };
 
