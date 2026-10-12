@@ -28,22 +28,12 @@ pub const Hit = struct {
     material: ecs.MaterialHandle = .{},
     frontFace: bool = false,
 
-    pub fn init(
-        ray: *const Ray,
-        point: V3,
-        normal: V3,
-        t: f64,
-        material: ecs.MaterialHandle,
-    ) Hit {
+    pub fn computeFront(self: *Hit, ray: *const Ray) void {
         // ray is hitting front if it points against normal dir, otherwise back face
-        const front_face = normal.dot(ray.dir) < 0;
-        return .{
-            .point = point,
-            .normal = if (front_face) normal else normal.mul(-1),
-            .t = t,
-            .material = material,
-            .frontFace = front_face,
-        };
+        self.frontFace = self.normal.dot(ray.dir) < 0;
+        if (!self.frontFace) {
+            self.normal = self.normal.mul(-1);
+        }
     }
 };
 

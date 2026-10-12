@@ -65,7 +65,15 @@ pub const Sphere = struct {
 
         const point = ray.at(t.?);
         const n = point.sub(origin_now).unit();
-        hitOut.* = Hit.init(ray, point, n, t.?, self.material);
+        hitOut.* = .{
+            .point = point,
+            .normal = n,
+            .t = t.?,
+            .u = (std.math.atan2(-n.z, n.x) + std.math.pi) / (2 * std.math.pi),
+            .v = std.math.acos(-n.y) / std.math.pi,
+            .material = self.material,
+        };
+        hitOut.computeFront(ray);
         return true;
     }
 };
