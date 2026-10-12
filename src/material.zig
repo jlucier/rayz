@@ -78,6 +78,21 @@ pub const ImageTexture = struct {
     }
 };
 
+pub const NoiseTexture = struct {
+    const perm_size: usize = 256;
+    const p = [256]usize{};
+
+    pub fn init(rng: std.Random) NoiseTexture {
+        for (0..perm_size) |i| {
+            const @intCast(rng.int(u8));
+        }
+    }
+
+    pub fn value(_: *const Texture, _: *const TextureValueParam) ?ScatterResult {
+        return null;
+    }
+};
+
 pub const Texture = union(enum) {
     checker: CheckerTexture,
     solid: SolidTexture,

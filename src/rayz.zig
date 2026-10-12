@@ -78,6 +78,7 @@ pub fn main(init: std.process.Init) !void {
         1 => try penultimateScene(init.io, arena, &params),
         2 => try checkeredSpheres(init.io, arena, &params),
         3 => try earth(init.io, arena, &params),
+        4 => try perlinSpheres(init.io, arena, &params),
         else => unreachable,
     };
 
@@ -105,6 +106,33 @@ pub fn main(init: std.process.Init) !void {
 
     try tracer.img.writePpm(&w.interface);
     try w.flush();
+}
+
+fn perlinSpheres(io: std.Io, allocator: std.mem.Allocator, params: *const Params) !Tracer {
+    var tracer = try Tracer.init(io, allocator, .{
+        .img_w = params.img_w,
+        .seed = params.seed,
+        .samples_per_px = params.samples,
+        .defocus_angle = 0.0,
+    });
+    _ = try tracer.pool.add(Sphere.stationary(
+        .{ .x = 0, .y = -1000, .z = 0 },
+        1000,
+        try tracer.pool.addAndReturnHandle(mat.Material{ .diffuse = .{
+            .texture = try tracer.pool.addAndReturnHandle(mat.Texture{ .checker = .{
+                .scale = 0.32,
+                .even = try tracer.pool.addAndReturnHandle(
+                    mat.Texture{
+                        .solid = .{ .color = .{ .x = 0.2, .y = 0.3, .z = 0.1 } },
+                    },
+                ),
+                .odd = try tracer.pool.addAndReturnHandle(
+                    mat.Texture{ .solid = .{ .color = V3.of(0.9) } },
+                ),
+            } }),
+        } }),
+    ));
+    return tracer;
 }
 
 fn earth(io: std.Io, allocator: std.mem.Allocator, params: *const Params) !Tracer {
