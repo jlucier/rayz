@@ -1,6 +1,7 @@
 pics
 *.ppm
 zig-out
+zig-pkg
 .zig-cache
 perf.data*
 .DS_Store

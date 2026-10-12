@@ -13,12 +13,17 @@ pub fn build(b: *std.Build) void {
         .root_module = mod,
     });
 
+    const zigimg_dependency = b.dependency("zigimg", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    exe.root_module.addImport("zigimg", zigimg_dependency.module("zigimg"));
+
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
-    if (b.args) |args| {
-        run_exe.addArgs(args);
-    }
+    run_exe.addPassthruArgs();
 
     const run_step = b.step("run", "Run the application");
     run_step.dependOn(&run_exe.step);

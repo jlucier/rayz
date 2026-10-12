@@ -1,0 +1,13 @@
+.{
+    .name = .rayz,
+    .version = "0.0.1",
+    .dependencies = .{
+        .zigimg = .{
+            .url = "git+https://github.com/zigimg/zigimg.git#734fa919fb15b7917d4eb124f53600348f4ffa30",
+            .hash = "zigimg-0.1.0-8_eo2sBLGACBebrhQZUwRliZNSUyDn6szp99eip_6-Rw",
+        },
+    },
+    .minimum_zig_version = "0.17.0",
+    .paths = .{""},
+    .fingerprint = 0xe74a4c8133e25d0e,
+}
