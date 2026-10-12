@@ -26,7 +26,7 @@ pub const Image = struct {
         return &self.pixels[i * self.w + j];
     }
 
-    pub fn writePPM(self: *const Image, w: *std.Io.Writer) !void {
+    pub fn writePpm(self: *const Image, w: *std.Io.Writer) !void {
         try w.print("P3\n{} {}\n{}\n", .{ self.w, self.h, 255 });
 
         for (self.pixels) |px| {

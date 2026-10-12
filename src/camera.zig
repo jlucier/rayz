@@ -4,62 +4,62 @@ const vec = @import("./vec.zig");
 const Ray = vec.Ray;
 const V3 = vec.V3;
 
-const DEG_TO_RAD = std.math.pi / 180.0;
+const deg_to_rad = std.math.pi / 180.0;
 
 pub const Camera = struct {
-    lookFrom: V3,
-    pxDu: V3,
-    pxDv: V3,
-    pxOrigin: V3,
-    defocusU: V3,
-    defocusV: V3,
+    look_from: V3,
+    px_du: V3,
+    px_dv: V3,
+    px_origin: V3,
+    defocus_u: V3,
+    defocus_v: V3,
     defocus: bool,
 
     pub fn init(
         vfov: f64,
-        focusDist: f64,
-        defocusAngle: f64,
-        lookFrom: V3,
-        lookAt: V3,
+        focus_dist: f64,
+        defocus_angle: f64,
+        look_from: V3,
+        look_at: V3,
         vup: V3,
-        imgHeight: usize,
-        imgWidth: usize,
+        img_height: usize,
+        img_width: usize,
     ) Camera {
-        const fimg_h: f64 = @floatFromInt(imgHeight);
-        const fimg_w: f64 = @floatFromInt(imgWidth);
+        const image_height_f: f64 = @floatFromInt(img_height);
+        const image_width_f: f64 = @floatFromInt(img_width);
 
-        const vp_height = 2 * std.math.tan(vfov * DEG_TO_RAD / 2.0) * focusDist;
-        const vp_width = vp_height * fimg_w / fimg_h;
+        const vp_height = 2 * std.math.tan(vfov * deg_to_rad / 2.0) * focus_dist;
+        const vp_width = vp_height * image_width_f / image_height_f;
 
-        const w = lookFrom.sub(lookAt).unit();
+        const w = look_from.sub(look_at).unit();
         const u = vup.cross(w).unit();
         const v = w.cross(u);
 
         const vp_u = u.mul(vp_width);
         const vp_v = v.mul(-vp_height);
-        const px_du = vp_u.div(fimg_w);
-        const px_dv = vp_v.div(fimg_h);
-        const defocus_radius = std.math.tan(defocusAngle * DEG_TO_RAD / 2) * focusDist;
+        const px_du = vp_u.div(image_width_f);
+        const px_dv = vp_v.div(image_height_f);
+        const defocus_radius = std.math.tan(defocus_angle * deg_to_rad / 2) * focus_dist;
 
-        const vp_origin = lookFrom.sub(w.mul(focusDist)).sub(vp_u.div(2)).sub(
+        const vp_origin = look_from.sub(w.mul(focus_dist)).sub(vp_u.div(2)).sub(
             vp_v.div(2),
         ).add(px_du.add(px_dv).mul(0.5));
 
         return .{
-            .lookFrom = lookFrom,
-            .pxDu = px_du,
-            .pxDv = px_dv,
-            .pxOrigin = vp_origin,
-            .defocusU = u.mul(defocus_radius),
-            .defocusV = v.mul(defocus_radius),
-            .defocus = defocusAngle > 0,
+            .look_from = look_from,
+            .px_du = px_du,
+            .px_dv = px_dv,
+            .px_origin = vp_origin,
+            .defocus_u = u.mul(defocus_radius),
+            .defocus_v = v.mul(defocus_radius),
+            .defocus = defocus_angle > 0,
         };
     }
 
     pub fn getRay(self: *const Camera, px: usize, py: usize, rng: ?std.Random) Ray {
         var x: f64 = @floatFromInt(px);
         var y: f64 = @floatFromInt(py);
-        var origin = self.lookFrom;
+        var origin = self.look_from;
         if (rng) |r| {
             x += r.float(f64) - 0.5;
             y += r.float(f64) - 0.5;
@@ -69,8 +69,8 @@ pub const Camera = struct {
 
         return Ray.init(
             origin,
-            self.pxDu.mul(x).add(self.pxDv.mul(y)).add(
-                self.pxOrigin,
+            self.px_du.mul(x).add(self.px_dv.mul(y)).add(
+                self.px_origin,
             ).sub(origin), // dir
             if (rng) |r| r.float(f64) else 0,
         );
@@ -84,12 +84,8 @@ pub const Camera = struct {
         while (true) {
             const v = V3{ .x = rng.float(f64) * 2 - 1, .y = rng.float(f64) * 2 - 1, .z = 0 };
             if (v.dot(v) <= 1) {
-                return self.defocusU.mul(v.x).add(self.defocusV.mul(v.y));
+                return self.defocus_u.mul(v.x).add(self.defocus_v.mul(v.y));
             }
         }
     }
 };
-
-
-
-

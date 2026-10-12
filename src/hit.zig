@@ -11,9 +11,9 @@ pub const Hittable = struct {
     hit: *const fn (
         ptr: *const anyopaque,
         ray: *const Ray,
-        hitOut: *Hit,
-        tmin: f64,
-        tmax: f64,
+        hit_out: *Hit,
+        t_min: f64,
+        t_max: f64,
     ) bool,
 };
 
@@ -26,12 +26,12 @@ pub const Hit = struct {
     u: f64 = 0,
     v: f64 = 0,
     material: ecs.MaterialHandle = .{},
-    frontFace: bool = false,
+    front_face: bool = false,
 
     pub fn computeFront(self: *Hit, ray: *const Ray) void {
         // ray is hitting front if it points against normal dir, otherwise back face
-        self.frontFace = self.normal.dot(ray.dir) < 0;
-        if (!self.frontFace) {
+        self.front_face = self.normal.dot(ray.dir) < 0;
+        if (!self.front_face) {
             self.normal = self.normal.mul(-1);
         }
     }
@@ -76,14 +76,14 @@ pub const AABB = struct {
         return self.diagonal().mag();
     }
 
-    pub fn hit(self: *const AABB, ray: *const Ray, tmin: f64, tmax: f64) bool {
+    pub fn hit(self: *const AABB, ray: *const Ray, t_min: f64, t_max: f64) bool {
         // solve ray equation for t at the low and high ends of the boundaries per axis
         // p(t) = q + dt
         // x - q = dt
-        const t0s = self.low.sub(ray.origin).vmul(ray.invDir);
-        const t1s = self.high.sub(ray.origin).vmul(ray.invDir);
-        var t0 = tmin;
-        var t1 = tmax;
+        const t0s = self.low.sub(ray.origin).vmul(ray.inv_dir);
+        const t1s = self.high.sub(ray.origin).vmul(ray.inv_dir);
+        var t0 = t_min;
+        var t1 = t_max;
         const axes = [_]u8{ 0, 1, 2 };
 
         // reduce all the solutions to the highest min and lowest max -- tightest range
@@ -109,11 +109,11 @@ pub const AABB = struct {
 pub const BVH = struct {
     allocator: std.mem.Allocator,
     bbox: AABB = .{},
-    starti: usize = 0,
-    endi: usize = 0,
+    start_index: usize = 0,
+    end_index: usize = 0,
     left: ?*BVH = null,
     right: ?*BVH = null,
-    hitChecks: usize = 0,
+    hit_checks: usize = 0,
 
     const SahSplit = struct {
         ax: u8 = 0,
@@ -138,85 +138,85 @@ pub const BVH = struct {
 
     /// Surface Area Heuristic implementation to split volumes on longest axis
     fn sahFindSplit(self: *const BVH, hittables: []const Hittable) SahSplit {
-        const nAx: u8 = 3;
-        const nStep: usize = 12;
+        const n_axes: u8 = 3;
+        const n_steps: usize = 12;
 
-        var costs: [nAx * nStep]SahSplit = undefined;
+        var costs: [n_axes * n_steps]SahSplit = undefined;
 
         for (&costs, 0..) |*c, i| {
-            c.ax = @intCast(i / nStep);
+            c.ax = @intCast(i / n_steps);
             c.cost = std.math.inf(f64);
 
-            const i_f: f64 = @floatFromInt(i % nStep);
-            const step = self.bbox.diagonal().at(c.ax) / nStep;
+            const i_f: f64 = @floatFromInt(i % n_steps);
+            const step = self.bbox.diagonal().at(c.ax) / n_steps;
 
             c.thresh = self.bbox.low.at(c.ax) + step * (i_f + 1);
 
             var a = AABB{};
             var b = AABB{};
-            var countA: usize = 0;
-            var countB: usize = 0;
+            var count_a: usize = 0;
+            var count_b: usize = 0;
 
             for (hittables) |h| {
                 if (h.bbox.center().at(c.ax) < c.thresh) {
                     a = AABB.enclose(a, h.bbox);
-                    countA += 1;
+                    count_a += 1;
                 } else {
                     b = AABB.enclose(b, h.bbox);
-                    countB += 1;
+                    count_b += 1;
                 }
             }
-            if (countA > 0 and countB > 0) {
-                const ca: f64 = @floatFromInt(countA);
-                const cb: f64 = @floatFromInt(countB);
+            if (count_a > 0 and count_b > 0) {
+                const ca: f64 = @floatFromInt(count_a);
+                const cb: f64 = @floatFromInt(count_b);
                 costs[i].cost = ca * a.surfaceArea() + cb * b.surfaceArea();
             }
         }
 
-        var minCost = &costs[0];
+        var min_cost = &costs[0];
         for (&costs) |*c| {
-            if (c.cost < minCost.cost) {
-                minCost = c;
+            if (c.cost < min_cost.cost) {
+                min_cost = c;
             }
         }
 
-        return minCost.*;
+        return min_cost.*;
     }
 
     fn hittableLess(ctx: SahSplit, a: Hittable, b: Hittable) bool {
         return a.bbox.center().at(ctx.ax) < b.bbox.center().at(ctx.ax);
     }
 
-    pub fn build(self: *BVH, hittables: *HittableList, si: usize, ei: usize) !void {
-        const nobjs = ei - si;
-        std.debug.assert(nobjs > 0);
+    pub fn build(self: *BVH, hittables: *HittableList, start_index: usize, end_index: usize) !void {
+        const object_count = end_index - start_index;
+        std.debug.assert(object_count > 0);
 
         // enclose all bboxes
-        for (hittables.items[si..ei]) |*h| {
+        for (hittables.items[start_index..end_index]) |*h| {
             self.bbox = AABB.enclose(self.bbox, h.bbox);
         }
 
-        if (nobjs <= 2) {
+        if (object_count <= 2) {
             // I myself will own these and will not subdivide
-            self.starti = si;
-            self.endi = ei;
+            self.start_index = start_index;
+            self.end_index = end_index;
             return;
         }
 
         // subdivide
-        const split = self.sahFindSplit(hittables.items[si..ei]);
+        const split = self.sahFindSplit(hittables.items[start_index..end_index]);
         std.mem.sort(
             Hittable,
-            hittables.items[si..ei],
+            hittables.items[start_index..end_index],
             split,
             hittableLess,
         );
 
         // find the point where the centers cross thresh
-        var threshI = si + 1;
-        for (hittables.items[si + 1 .. ei], si + 1..) |h, i| {
+        var thresh_i = start_index + 1;
+        for (hittables.items[start_index + 1 .. end_index], start_index + 1..) |h, i| {
             if (h.bbox.center().at(split.ax) >= split.thresh) {
-                threshI = i;
+                thresh_i = i;
                 break;
             }
         }
@@ -226,8 +226,8 @@ pub const BVH = struct {
         self.left.?.* = BVH.init(self.allocator);
         self.right.?.* = BVH.init(self.allocator);
 
-        try self.left.?.build(hittables, si, threshI);
-        try self.right.?.build(hittables, threshI, ei);
+        try self.left.?.build(hittables, start_index, thresh_i);
+        try self.right.?.build(hittables, thresh_i, end_index);
     }
 
     pub fn print(self: *const BVH, d: usize) !void {
@@ -241,9 +241,9 @@ pub const BVH = struct {
             prefix,
             d,
             self.left != null,
-            self.endi - self.starti,
+            self.end_index - self.start_index,
             self.bbox.diagonalLen(),
-            self.hitChecks,
+            self.hit_checks,
         });
 
         if (self.left != null) {
@@ -257,11 +257,11 @@ pub const BVH = struct {
         hit: *Hit,
         hittables: *const HittableList,
         ray: *const Ray,
-        tmin: f64,
-        tmax: f64,
+        t_min: f64,
+        t_max: f64,
     ) bool {
-        // self.hitChecks += 1;
-        if (!self.bbox.hit(ray, tmin, tmax)) {
+        // self.hit_checks += 1;
+        if (!self.bbox.hit(ray, t_min, t_max)) {
             return false;
         }
 
@@ -269,22 +269,22 @@ pub const BVH = struct {
 
         if (self.left != null) {
             // have children, check them
-            maybe_hit = self.left.?.findHit(hit, hittables, ray, tmin, tmax);
+            maybe_hit = self.left.?.findHit(hit, hittables, ray, t_min, t_max);
             maybe_hit |= self.right.?.findHit(
                 hit,
                 hittables,
                 ray,
-                tmin,
-                if (maybe_hit) hit.t else tmax,
+                t_min,
+                if (maybe_hit) hit.t else t_max,
             );
             return maybe_hit;
         }
 
         // no children, check hittables
-        for (hittables.items[self.starti..self.endi]) |*h| {
-            const maxt = if (maybe_hit) hit.t else tmax;
+        for (hittables.items[self.start_index..self.end_index]) |*h| {
+            const maxt = if (maybe_hit) hit.t else t_max;
 
-            if (h.hit(h.ptr, ray, hit, tmin, maxt)) {
+            if (h.hit(h.ptr, ray, hit, t_min, maxt)) {
                 maybe_hit = true;
             }
         }
@@ -302,7 +302,7 @@ const DummyHittable = struct {
                 .point = V3{},
                 .normal = V3{},
                 .t = 0,
-                .frontFace = true,
+                .front_face = true,
                 .material = .{ .idx = 0 },
             };
             return true;

@@ -33,9 +33,9 @@ pub const Sphere = struct {
     pub fn hit(
         ptr: *const anyopaque,
         ray: *const Ray,
-        hitOut: *Hit,
-        tmin: f64,
-        tmax: f64,
+        hit_out: *Hit,
+        t_min: f64,
+        t_max: f64,
     ) bool {
         const self: *const Sphere = @ptrCast(@alignCast(ptr));
 
@@ -56,8 +56,8 @@ pub const Sphere = struct {
         const t1 = (half_b - rt) / a;
         const t2 = (half_b + rt) / a;
 
-        const t: ?f64 = if (t1 >= tmin and t1 <= tmax) t1 //
-            else if (t2 >= tmin and t2 <= tmax) t2 //
+        const t: ?f64 = if (t1 >= t_min and t1 <= t_max) t1 //
+            else if (t2 >= t_min and t2 <= t_max) t2 //
             else null;
 
         if (t == null)
@@ -65,7 +65,7 @@ pub const Sphere = struct {
 
         const point = ray.at(t.?);
         const n = point.sub(origin_now).unit();
-        hitOut.* = .{
+        hit_out.* = .{
             .point = point,
             .normal = n,
             .t = t.?,
@@ -73,7 +73,7 @@ pub const Sphere = struct {
             .v = std.math.acos(-n.y) / std.math.pi,
             .material = self.material,
         };
-        hitOut.computeFront(ray);
+        hit_out.computeFront(ray);
         return true;
     }
 };

@@ -65,24 +65,24 @@ pub const ScatterResult = struct {
 };
 
 pub const DiffuseScatterMethod = enum {
-    UNIT_SPHERE,
-    UNIT_SPHERE_SURFACE,
-    HEMISPHERE,
+    unit_sphere,
+    unit_sphere_surface,
+    hemisphere,
 };
 
 pub const DiffuseMaterial = struct {
-    method: DiffuseScatterMethod = .UNIT_SPHERE_SURFACE,
+    method: DiffuseScatterMethod = .unit_sphere_surface,
     texture: ecs.TextureHandle,
 
     pub fn scatter(self: *const DiffuseMaterial, args: ScatterParam) ?ScatterResult {
         var target = switch (self.method) {
-            .UNIT_SPHERE => args.hit.point.add(args.hit.normal).add(
+            .unit_sphere => args.hit.point.add(args.hit.normal).add(
                 randomInUnitSphere(args.random),
             ),
-            .UNIT_SPHERE_SURFACE => args.hit.point.add(args.hit.normal).add(
+            .unit_sphere_surface => args.hit.point.add(args.hit.normal).add(
                 randomUnit(args.random),
             ),
-            .HEMISPHERE => args.hit.point.add(randomInHemisphere(args.random, args.hit.normal)),
+            .hemisphere => args.hit.point.add(randomInHemisphere(args.random, args.hit.normal)),
         };
         if (target.nearZero())
             target = args.hit.normal;
@@ -137,7 +137,7 @@ pub const DielectricMaterial = struct {
     refractive_index: f64 = 1.0,
 
     pub fn scatter(self: *const DielectricMaterial, args: ScatterParam) ScatterResult {
-        const eta = if (args.hit.frontFace) 1 / self.refractive_index else self.refractive_index;
+        const eta = if (args.hit.front_face) 1 / self.refractive_index else self.refractive_index;
         const unit_dir = args.ray.dir.unit();
 
         const cos_theta = unit_dir.mul(-1).dot(args.hit.normal);

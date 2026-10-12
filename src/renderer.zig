@@ -13,56 +13,56 @@ const Hittable = hitmod.Hittable;
 const HittableList = hitmod.HittableList;
 const BVH = hitmod.BVH;
 
-const ASPECT_RATIO = 16.0 / 9.0;
+const aspect_ratio = 16.0 / 9.0;
 
 pub const Tracer = struct {
     io: std.Io,
     allocator: std.mem.Allocator,
     camera: Camera,
     img: image.Image,
-    maxBounces: usize = 50,
-    samplesPerPx: usize = 10,
+    max_bounces: usize = 50,
+    samples_per_px: usize = 10,
     hittables: HittableList,
     bvh: BVH,
     pool: MemPool,
     seed: u64,
 
     pub const Options = struct {
-        imgW: usize,
+        img_w: usize,
         seed: u64,
-        maxBounces: usize = 50,
-        samplesPerPx: usize = 10,
+        max_bounces: usize = 50,
+        samples_per_px: usize = 10,
         vfov: f64 = 20,
-        focusDist: f64 = 10,
-        defocusAngle: f64 = 0.6,
-        lookFrom: V3 = .{ .x = 13, .y = 2, .z = 3 },
-        lookAt: V3 = .{},
+        focus_dist: f64 = 10,
+        defocus_angle: f64 = 0.6,
+        look_from: V3 = .{ .x = 13, .y = 2, .z = 3 },
+        look_at: V3 = .{},
         vup: V3 = V3.yHat(),
     };
 
     pub fn init(io: std.Io, allocator: std.mem.Allocator, opts: Options) !Tracer {
-        const fimgW: f64 = @floatFromInt(opts.imgW);
-        const height: usize = @intFromFloat(fimgW / ASPECT_RATIO);
+        const image_width_f: f64 = @floatFromInt(opts.img_w);
+        const height: usize = @intFromFloat(image_width_f / aspect_ratio);
 
         return .{
             .io = io,
             .allocator = allocator,
             .camera = Camera.init(
                 opts.vfov,
-                opts.focusDist,
-                opts.defocusAngle,
-                opts.lookFrom,
-                opts.lookAt,
+                opts.focus_dist,
+                opts.defocus_angle,
+                opts.look_from,
+                opts.look_at,
                 opts.vup,
                 height,
-                opts.imgW,
+                opts.img_w,
             ),
-            .img = try image.Image.initEmpty(allocator, height, opts.imgW),
+            .img = try image.Image.initEmpty(allocator, height, opts.img_w),
             .hittables = HittableList.init(allocator),
             .bvh = BVH.init(allocator),
             .pool = MemPool.init(allocator),
             .seed = opts.seed,
-            .samplesPerPx = opts.samplesPerPx,
+            .samples_per_px = opts.samples_per_px,
         };
     }
 
@@ -77,7 +77,7 @@ pub const Tracer = struct {
         start: usize,
         end: usize,
         rays: usize = 0,
-        donePixels: usize = 0,
+        done_pixels: usize = 0,
     };
 
     pub fn render(self: *Tracer) !usize {
@@ -85,21 +85,21 @@ pub const Tracer = struct {
         try self.pool.initHittables(&self.hittables);
         try self.bvh.build(&self.hittables, 0, self.hittables.items.len);
 
-        const minRowsPerThread: f64 = 10;
-        const imgh: f64 = @floatFromInt(self.img.h);
-        const nRowChunks: usize = @intFromFloat(@ceil(imgh / minRowsPerThread));
-        const nWorkers = @min(nRowChunks, try std.Thread.getCpuCount());
-        const nwf: f64 = @floatFromInt(nWorkers);
-        const rowsPerThread: usize = @intFromFloat(@ceil(imgh / nwf));
+        const min_rows_per_thread: f64 = 10;
+        const image_height_f: f64 = @floatFromInt(self.img.h);
+        const row_chunk_count: usize = @intFromFloat(@ceil(image_height_f / min_rows_per_thread));
+        const worker_count = @min(row_chunk_count, try std.Thread.getCpuCount());
+        const worker_count_f: f64 = @floatFromInt(worker_count);
+        const rows_per_thread: usize = @intFromFloat(@ceil(image_height_f / worker_count_f));
 
-        const workers: []Worker = try self.allocator.alloc(Worker, nWorkers);
+        const workers: []Worker = try self.allocator.alloc(Worker, worker_count);
         defer self.allocator.free(workers);
 
         for (workers, 0..) |*w, i| {
-            w.donePixels = 0;
+            w.done_pixels = 0;
             w.rays = 0;
-            w.start = i * rowsPerThread;
-            w.end = @min(self.img.h, (i + 1) * rowsPerThread);
+            w.start = i * rows_per_thread;
+            w.end = @min(self.img.h, (i + 1) * rows_per_thread);
             w.thread = try std.Thread.spawn(.{}, Tracer.threadRender, .{ self, w });
         }
 
@@ -107,7 +107,7 @@ pub const Tracer = struct {
         while (true) {
             var done: usize = 0;
             for (workers) |*w| {
-                done += w.donePixels;
+                done += w.done_pixels;
             }
             const ft: f32 = @floatFromInt(tot);
             const fd: f32 = @floatFromInt(done);
@@ -138,16 +138,16 @@ pub const Tracer = struct {
             for (0..self.img.w) |i| {
                 var r: usize = 0;
                 var acc_color = V3{};
-                while (r < self.samplesPerPx) : (r += 1) {
+                while (r < self.samples_per_px) : (r += 1) {
                     const ray = self.camera.getRay(i, j, rng.random());
                     w.rays += 1;
-                    acc_color = acc_color.add(self.bounceRay(&ray, &rng, self.maxBounces));
+                    acc_color = acc_color.add(self.bounceRay(&ray, &rng, self.max_bounces));
                 }
 
                 self.img.pixels[j * self.img.w + i] = //
-                    acc_color.div(@floatFromInt(self.samplesPerPx));
+                    acc_color.div(@floatFromInt(self.samples_per_px));
 
-                w.donePixels += 1;
+                w.done_pixels += 1;
             }
         }
     }

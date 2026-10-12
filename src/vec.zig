@@ -163,14 +163,14 @@ pub const V3 = struct {
 pub const Ray = struct {
     origin: V3,
     dir: V3,
-    invDir: V3,
+    inv_dir: V3,
     time: f64 = 0,
 
     pub fn init(origin: V3, dir: V3, time: f64) Ray {
         return .{
             .origin = origin,
             .dir = dir,
-            .invDir = dir.inverse(),
+            .inv_dir = dir.inverse(),
             .time = time,
         };
     }

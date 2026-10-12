@@ -10,24 +10,24 @@ const V3 = vec.V3;
 const Sphere = geom.Sphere;
 
 const Params = struct {
-    imgW: usize = 0,
+    img_w: usize = 0,
     seed: u64 = 0,
     samples: usize = 10,
     scene: u8 = 0,
-    outFile: ?[]const u8 = null,
+    out_file: ?[]const u8 = null,
 };
 
 fn processArgs(io: std.Io, args: []const []const u8) !Params {
     var params = Params{};
 
-    const namedArgs: [3][]const u8 = .{
+    const named_args: [3][]const u8 = .{
         "--seed=",
         "--samples=",
         "--scene=",
     };
 
     outer: for (args[1..]) |a| {
-        for (namedArgs, 0..) |prefix, i| {
+        for (named_args, 0..) |prefix, i| {
             if (a.len >= prefix.len and std.mem.eql(u8, prefix, a[0..prefix.len])) {
                 const part = a[prefix.len..];
                 switch (i) {
@@ -46,11 +46,11 @@ fn processArgs(io: std.Io, args: []const []const u8) !Params {
             }
         }
 
-        // positional = imgW or file
+        // positional = img_w or file
         if (std.fmt.parseUnsigned(usize, a, 10)) |v| {
-            params.imgW = v;
+            params.img_w = v;
         } else |_| {
-            params.outFile = a;
+            params.out_file = a;
         }
     }
 
@@ -92,21 +92,21 @@ pub fn main(init: std.process.Init) !void {
     var opt_f: ?std.Io.File = null;
     defer if (opt_f) |f| f.close(init.io);
 
-    var w: std.Io.File.Writer = if (params.outFile) |out_fname| blk: {
+    var w: std.Io.File.Writer = if (params.out_file) |out_fname| blk: {
         opt_f = try std.Io.Dir.cwd().createFile(init.io, out_fname, .{ .read = false, .truncate = true });
         break :blk opt_f.?.writer(init.io, &buf);
     } else std.Io.File.stdout().writerStreaming(init.io, &buf);
 
-    try tracer.img.writePPM(&w.interface);
+    try tracer.img.writePpm(&w.interface);
     try w.flush();
 }
 
 fn checkeredSpheres(io: std.Io, allocator: std.mem.Allocator, params: *const Params) !Tracer {
     var tracer = try Tracer.init(io, allocator, .{
-        .imgW = params.imgW,
+        .img_w = params.img_w,
         .seed = params.seed,
-        .samplesPerPx = params.samples,
-        .defocusAngle = 0.0,
+        .samples_per_px = params.samples,
+        .defocus_angle = 0.0,
     });
 
     const checker = try tracer.pool.addAndReturnHandle(mat.Material{ .diffuse = .{
@@ -129,9 +129,9 @@ fn checkeredSpheres(io: std.Io, allocator: std.mem.Allocator, params: *const Par
 
 fn randomBouncing(io: std.Io, allocator: std.mem.Allocator, params: *const Params) !Tracer {
     var tracer = try Tracer.init(io, allocator, .{
-        .imgW = params.imgW,
+        .img_w = params.img_w,
         .seed = params.seed,
-        .samplesPerPx = params.samples,
+        .samples_per_px = params.samples,
     });
     // ground
     _ = try tracer.pool.add(Sphere.stationary(
@@ -247,13 +247,13 @@ fn randomBouncing(io: std.Io, allocator: std.mem.Allocator, params: *const Param
 
 fn penultimateScene(io: std.Io, allocator: std.mem.Allocator, params: *const Params) !Tracer {
     var tracer = try Tracer.init(io, allocator, .{
-        .imgW = params.imgW,
-        .focusDist = 3.4,
-        .defocusAngle = 10,
-        .lookFrom = .{ .x = -2, .y = 2, .z = 1 },
-        .lookAt = .{ .x = 0, .y = 0, .z = -1 },
+        .img_w = params.img_w,
+        .focus_dist = 3.4,
+        .defocus_angle = 10,
+        .look_from = .{ .x = -2, .y = 2, .z = 1 },
+        .look_at = .{ .x = 0, .y = 0, .z = -1 },
         .seed = params.seed,
-        .samplesPerPx = params.samples,
+        .samples_per_px = params.samples,
     });
 
     _ = try tracer.pool.add(Sphere.stationary(
