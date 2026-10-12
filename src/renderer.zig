@@ -87,7 +87,9 @@ pub const Tracer = struct {
 
         const min_rows_per_thread: f64 = 10;
         const image_height_f: f64 = @floatFromInt(self.img.h);
-        const row_chunk_count: usize = @intFromFloat(@ceil(image_height_f / min_rows_per_thread));
+        const row_chunk_count: usize = @intFromFloat(
+            @ceil(image_height_f / min_rows_per_thread),
+        );
         const worker_count = @min(row_chunk_count, try std.Thread.getCpuCount());
         const worker_count_f: f64 = @floatFromInt(worker_count);
         const rows_per_thread: usize = @intFromFloat(@ceil(image_height_f / worker_count_f));
@@ -162,18 +164,18 @@ pub const Tracer = struct {
             return V3{};
 
         var hit = Hit{};
+        var scat = mat.ScatterParam{
+            .random = rng.random(),
+            .ray = ray,
+            .hit = &hit,
+            .textures = self.pool.textures.items,
+        };
 
         if (self.bvh.findHit(&hit, &self.hittables, ray, 1e-10, std.math.inf(f64))) {
             // bounce light
             var ret = V3{};
             const m = hit.material.get(self.pool.materials.items);
-            const param = mat.ScatterParam{
-                .random = rng.random(),
-                .ray = ray,
-                .hit = &hit,
-                .textures = self.pool.textures.items,
-            };
-            if (m.scatter(param)) |res| {
+            if (m.scatter(&scat)) |res| {
                 ret = self.bounceRay(&res.ray, rng, depth - 1).vmul(res.attenuation);
             }
             return ret;

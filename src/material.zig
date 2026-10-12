@@ -116,7 +116,7 @@ pub const DiffuseMaterial = struct {
     method: DiffuseScatterMethod = .unit_sphere_surface,
     texture: ecs.TextureHandle,
 
-    pub fn scatter(self: *const DiffuseMaterial, args: ScatterParam) ?ScatterResult {
+    pub fn scatter(self: *const DiffuseMaterial, args: *const ScatterParam) ?ScatterResult {
         var target = switch (self.method) {
             .unit_sphere => args.hit.point.add(args.hit.normal).add(
                 randomInUnitSphere(args.random),
@@ -149,7 +149,7 @@ pub const MetallicMaterial = struct {
     fuzz: f64 = 0,
     texture: ecs.TextureHandle,
 
-    pub fn scatter(self: *const MetallicMaterial, args: ScatterParam) ?ScatterResult {
+    pub fn scatter(self: *const MetallicMaterial, args: *const ScatterParam) ?ScatterResult {
         var reflection_dir = reflect(args.ray, args.hit).unit();
         if (self.fuzz > 0) {
             reflection_dir = reflection_dir.add(
@@ -178,7 +178,7 @@ pub const MetallicMaterial = struct {
 pub const DielectricMaterial = struct {
     refractive_index: f64 = 1.0,
 
-    pub fn scatter(self: *const DielectricMaterial, args: ScatterParam) ScatterResult {
+    pub fn scatter(self: *const DielectricMaterial, args: *const ScatterParam) ScatterResult {
         const eta = if (args.hit.front_face) 1 / self.refractive_index else self.refractive_index;
         const unit_dir = args.ray.dir.unit();
 
@@ -210,7 +210,7 @@ pub const Material = union(enum) {
 
     pub fn scatter(
         self: *const Material,
-        args: ScatterParam,
+        args: *const ScatterParam,
     ) ?ScatterResult {
         return switch (self.*) {
             .diffuse => self.diffuse.scatter(args),
