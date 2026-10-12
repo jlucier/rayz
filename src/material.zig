@@ -2,6 +2,8 @@ const std = @import("std");
 const vec = @import("./vec.zig");
 const hitmod = @import("./hit.zig");
 const ecs = @import("./ecs.zig");
+const utils = @import("./utils.zig");
+const zigimg = @import("zigimg");
 
 const V3 = vec.V3;
 const Ray = vec.Ray;
@@ -38,14 +40,54 @@ pub const CheckerTexture = struct {
     }
 };
 
+pub const ImageTexture = struct {
+    img: zigimg.Image,
+
+    pub fn init(io: std.Io, alloc: std.mem.Allocator, f: []const u8) !ImageTexture {
+        var read_buffer: [zigimg.io.DEFAULT_BUFFER_SIZE]u8 = undefined;
+        return .{
+            .img = try zigimg.Image.fromFilePath(
+                alloc,
+                io,
+                f,
+                read_buffer[0..],
+            ),
+        };
+    }
+
+    pub fn deinit(self: *ImageTexture) void {
+        self.img.deinit();
+    }
+
+    pub fn value(self: *const ImageTexture, args: TextureValueParam) V3 {
+        const fw: f64 = @floatFromInt(self.img.width);
+        const fh: f64 = @floatFromInt(self.img.height);
+        const x: usize = @intFromFloat(utils.clamp(f64, args.u, 0, 1) * fw);
+        const y: usize = @intFromFloat(utils.clamp(f64, 1 - args.v, 0, 1) * fh);
+        const i = (self.img.width * y + x);
+
+        const a: f32 = @floatFromInt(self.img.pixels.rgb24[i].r);
+        const b: f32 = @floatFromInt(self.img.pixels.rgb24[i].g);
+        const c: f32 = @floatFromInt(self.img.pixels.rgb24[i].b);
+
+        return .{
+            .x = @floatCast(a / 255),
+            .y = @floatCast(b / 255),
+            .z = @floatCast(c / 255),
+        };
+    }
+};
+
 pub const Texture = union(enum) {
     checker: CheckerTexture,
     solid: SolidTexture,
+    image: ImageTexture,
 
     pub fn value(self: *const Texture, args: TextureValueParam) V3 {
         return switch (self.*) {
             .checker => self.checker.value(args),
             .solid => self.solid.value(args),
+            .image => self.image.value(args),
         };
     }
 };

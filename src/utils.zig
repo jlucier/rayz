@@ -1,25 +1,7 @@
 const std = @import("std");
 
-pub fn min(comptime T: type, a: T, b: T) T {
-    return if (a < b) a else b;
-}
-
-pub fn max(comptime T: type, a: T, b: T) T {
-    return if (a > b) a else b;
-}
-
 pub fn clamp(comptime T: type, x: T, low: T, high: T) T {
-    return min(T, max(T, x, low), high);
-}
-
-test "min" {
-    try std.testing.expectEqual(min(u8, 1, 2), 1);
-    try std.testing.expectEqual(min(f16, 10.0, -0.5), -0.5);
-}
-
-test "max" {
-    try std.testing.expectEqual(max(u8, 1, 2), 2);
-    try std.testing.expectEqual(max(f16, 10.0, -0.5), 10.0);
+    return @min(@max(x, low), high);
 }
 
 test "clamp" {

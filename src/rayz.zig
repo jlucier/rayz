@@ -72,6 +72,7 @@ pub fn main(init: std.process.Init) !void {
         0 => try randomBouncing(init.io, arena, &params),
         1 => try penultimateScene(init.io, arena, &params),
         2 => try checkeredSpheres(init.io, arena, &params),
+        3 => try earth(init.io, arena, &params),
         else => unreachable,
     };
 
@@ -99,6 +100,33 @@ pub fn main(init: std.process.Init) !void {
 
     try tracer.img.writePpm(&w.interface);
     try w.flush();
+}
+
+fn earth(io: std.Io, allocator: std.mem.Allocator, params: *const Params) !Tracer {
+    var tracer = try Tracer.init(io, allocator, .{
+        .img_w = params.img_w,
+        .seed = params.seed,
+        .samples_per_px = params.samples,
+        .look_from = .{ .x = 0, .y = 0, .z = 12 },
+        .defocus_angle = 0.0,
+    });
+
+    _ = try tracer.pool.add(Sphere.stationary(
+        .{},
+        2,
+        try tracer.pool.addAndReturnHandle(
+            mat.Material{ .diffuse = .{ .texture = try tracer.pool.addAndReturnHandle(
+                mat.Texture{
+                    .image = try mat.ImageTexture.init(
+                        io,
+                        allocator,
+                        "images/earthmap.jpg",
+                    ),
+                },
+            ) } },
+        ),
+    ));
+    return tracer;
 }
 
 fn checkeredSpheres(io: std.Io, allocator: std.mem.Allocator, params: *const Params) !Tracer {
